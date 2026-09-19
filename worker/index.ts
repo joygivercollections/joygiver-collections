@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { authRoutes } from "./routes/auth";
+import { adminRoutes } from "./routes/admin";
 import { publicRoutes } from "./routes/public";
+import { findRegisteredImage } from "./db/products";
 
 export interface Env {
   DB: D1Database;
@@ -18,6 +20,32 @@ app.get("/api/health", (context) =>
 
 app.route("/api", publicRoutes);
 app.route("/api/auth", authRoutes);
+app.route("/api/admin", adminRoutes);
+
+app.get("/media/*", async (context) => {
+  const pathname = new URL(context.req.url).pathname;
+  const encodedKey = pathname.slice("/media/".length);
+  let key: string;
+  try {
+    key = encodedKey
+      .split("/")
+      .map((segment) => decodeURIComponent(segment))
+      .join("/");
+  } catch {
+    return context.notFound();
+  }
+  const metadata = await findRegisteredImage(context.env.DB, key);
+  if (!metadata) return context.notFound();
+  const object = await context.env.PRODUCT_IMAGES.get(metadata.objectKey);
+  if (!object) return context.notFound();
+  return new Response(object.body, {
+    headers: {
+      "Content-Type": metadata.contentType,
+      "Cache-Control": "public, max-age=31536000, immutable",
+      ETag: object.httpEtag,
+    },
+  });
+});
 
 app.all("*", (context) => {
   if (!context.env.ASSETS) return context.notFound();

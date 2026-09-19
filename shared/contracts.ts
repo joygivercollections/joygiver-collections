@@ -37,6 +37,26 @@ export interface Product extends ProductSummary {
   images: ProductImage[];
 }
 
+export interface AdminProduct
+  extends Omit<Product, "publishedAt"> {
+  published: boolean;
+  publishedAt: string | null;
+}
+
+export interface AdminCategory extends CategorySummary {
+  active: boolean;
+  displayOrder: number;
+}
+
+export interface InventorySummary {
+  total: number;
+  available: number;
+  sold: number;
+  hidden: number;
+  new: number;
+  thrifted: number;
+}
+
 export interface CatalogueFilters {
   condition?: ProductCondition;
   category?: string;

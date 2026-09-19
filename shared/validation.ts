@@ -45,6 +45,7 @@ const cartValidationLineSchema = z.object({
   productId: z.string().trim().min(1).max(80),
   size: z.string().trim().min(1).max(80),
   quantity: z.number().int().min(1).max(999),
+  lastKnownPriceKobo: z.number().int().positive().safe(),
 });
 
 export const cartValidationSchema = z.object({

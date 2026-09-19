@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { cartValidationSchema } from "../../shared/validation";
 import { listActiveCategories } from "../db/categories";
-import { getPublicProduct, listPublicProducts } from "../db/products";
+import { getPublicProduct, listPublicProducts, validateCart } from "../db/products";
 
 interface PublicBindings {
   DB: D1Database;
@@ -89,4 +90,26 @@ publicRoutes.get("/products/:slug", async (context) => {
   }
 
   return context.json(product);
+});
+
+publicRoutes.post("/cart/validate", async (context) => {
+  let body: unknown;
+  try {
+    body = await context.req.json();
+  } catch {
+    body = null;
+  }
+  const parsed = cartValidationSchema.safeParse(body);
+  if (!parsed.success) {
+    return context.json(
+      {
+        status: 400,
+        code: "invalid_cart",
+        message: "Selected cart items are invalid",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      },
+      400,
+    );
+  }
+  return context.json(await validateCart(context.env.DB, parsed.data.items));
 });
