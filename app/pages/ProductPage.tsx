@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import type { Product } from "../../shared/contracts";
 import { formatNaira, getProduct } from "../api";
 import { RouteError } from "../components/RouteError";
+import { upsertCartLine } from "../cart/cart-store";
 
 export function ProductPage() {
   const { slug = "" } = useParams();
@@ -10,6 +11,7 @@ export function ProductPage() {
   const [selectedSize, setSelectedSize] = useState("");
   const [error, setError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const [added, setAdded] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -58,9 +60,23 @@ export function ProductPage() {
             </div>
           </fieldset>
           {product.condition === "thrifted" ? <div className="condition-note"><strong>Condition note</strong><p>Every thrifted piece is carefully checked. Please review the photos and description for its individual character.</p></div> : null}
-          <button className="button button--dark product-info__add" type="button" disabled={sold || !selectedSize}>
+          <button className="button button--dark product-info__add" type="button" disabled={sold || !selectedSize} onClick={() => {
+            if (!selectedSize) return;
+            upsertCartLine({
+              productId: product.id,
+              reference: product.reference,
+              name: product.name,
+              size: selectedSize,
+              quantity: 1,
+              lastKnownPriceKobo: product.priceKobo,
+              imageUrl: product.primaryImage?.url ?? null,
+              selected: true,
+            }, product.condition);
+            setAdded(true);
+          }}>
             {sold ? "Sold out" : selectedSize ? "Add to bag" : "Select a size"}
           </button>
+          {added ? <p className="added-message" role="status">Added to your bag. <Link to="/cart">View bag</Link></p> : null}
           <div className="product-assurances">
             <p><span aria-hidden="true">◇</span> Abuja based</p>
             <p><span aria-hidden="true">◇</span> Nationwide delivery</p>

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { ProductSummary } from "../../shared/contracts";
 import { formatNaira } from "../api";
+import { upsertCartLine } from "../cart/cart-store";
 
 interface ProductCardProps {
   product: ProductSummary;
@@ -41,6 +42,18 @@ export function ProductCard({ product }: ProductCardProps) {
       <p className="product-card__meta">
         {product.reference} <span aria-hidden="true">·</span> Sizes {product.sizes.join(", ")}
       </p>
+      {!sold && product.sizes.length === 1 ? (
+        <button className="product-card__quick-add" type="button" onClick={() => upsertCartLine({
+          productId: product.id,
+          reference: product.reference,
+          name: product.name,
+          size: product.sizes[0],
+          quantity: 1,
+          lastKnownPriceKobo: product.priceKobo,
+          imageUrl: product.primaryImage?.url ?? null,
+          selected: true,
+        }, product.condition)}>Quick add · {product.sizes[0]}</button>
+      ) : null}
     </article>
   );
 }

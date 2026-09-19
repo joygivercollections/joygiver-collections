@@ -1,9 +1,12 @@
 import { FormEvent, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useCart } from "../cart/cart-store";
 
 export function Layout() {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const cart = useCart();
+  const cartCount = cart.reduce((count, line) => count + line.quantity, 0);
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
@@ -28,9 +31,9 @@ export function Layout() {
             <NavLink to="/new">New</NavLink>
             <NavLink to="/thrifted">Thrifted</NavLink>
           </nav>
-          <NavLink className="cart-link" to="/cart" aria-label="Shopping bag, 0 items">
+          <NavLink className="cart-link" to="/cart" aria-label={`Shopping bag, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}>
             <span aria-hidden="true">Bag</span>
-            <span className="cart-link__count">0</span>
+            <span className="cart-link__count">{cartCount}</span>
           </NavLink>
         </div>
         <div className="site-header__search page-width">
