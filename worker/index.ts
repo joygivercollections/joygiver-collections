@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { publicRoutes } from "./routes/public";
 
 export interface Env {
   DB: D1Database;
@@ -14,6 +15,11 @@ app.get("/api/health", (context) =>
   context.json({ ok: true, service: "joygiver-collections" }),
 );
 
-app.all("*", (context) => context.env.ASSETS.fetch(context.req.raw));
+app.route("/api", publicRoutes);
+
+app.all("*", (context) => {
+  if (!context.env.ASSETS) return context.notFound();
+  return context.env.ASSETS.fetch(context.req.raw);
+});
 
 export default app;

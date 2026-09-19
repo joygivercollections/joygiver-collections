@@ -9,8 +9,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "npm run test:dom && npm run test:worker",
+    "test:dom": "vitest run --config vite.config.ts",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
+    "test:watch": "vitest --config vite.config.ts",
+    "test:worker:watch": "vitest --config vitest.worker.config.ts",
     "typecheck": "tsc --noEmit",
     "cf:typegen": "wrangler types worker-configuration.d.ts",
     "deploy": "npm run build && wrangler deploy"
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.56.0",
+    "@cloudflare/vitest-plugin": "1.1.13",
     "@cloudflare/workers-types": "5.20260919.1",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
@@ -35,7 +39,7 @@
     "jsdom": "27.0.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
-    "vitest": "5.0.1",
+    "vitest": "4.1.11",
     "wrangler": "4.135.0"
   }
 }
