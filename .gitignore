@@ -3,5 +3,6 @@ dist/
 coverage/
 .dev.vars
 .env
+.wrangler/
 worker-configuration.d.ts
 *.log
