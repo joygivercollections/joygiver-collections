@@ -1,20 +1,7 @@
 import { env, exports } from "cloudflare:workers";
-import { applyD1Migrations, type D1Migration } from "cloudflare:test";
+import { applyD1Migrations } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { listPublicProducts } from "../../worker/db/products";
-
-declare global {
-  namespace Cloudflare {
-    interface Env {
-      DB: D1Database;
-      TEST_MIGRATIONS: D1Migration[];
-    }
-
-    interface GlobalProps {
-      mainModule: typeof import("../../worker/index");
-    }
-  }
-}
 
 interface SeedProduct {
   id: string;

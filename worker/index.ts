@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
 
 export interface Env {
@@ -16,6 +17,7 @@ app.get("/api/health", (context) =>
 );
 
 app.route("/api", publicRoutes);
+app.route("/api/auth", authRoutes);
 
 app.all("*", (context) => {
   if (!context.env.ASSETS) return context.notFound();
