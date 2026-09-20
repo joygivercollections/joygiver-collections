@@ -98,7 +98,7 @@ The owner signs in at `/owner/login`.
 
 ## Brand files and social links
 
-The storefront logo and hero artwork are deliberately file-based so they can be replaced without changing page components. Overwrite `public/brand/logo.svg` and `public/brand/hero-art.svg` while keeping those filenames, or change their paths in `app/config.ts`.
+The storefront logo and hero artwork are deliberately file-based so they can be replaced without changing page components. Overwrite `public/brand/logo.svg` and `public/brand/hero-art.svg` while keeping those filenames, or change their paths in `app/config.ts`. The home collection-panel photos are `public/brand/new-edit.png` and `public/brand/thrifted-edit.png`.
 
 Add the store's Facebook, Instagram, and TikTok profile URLs in `app/config.ts`. Until real URLs are added, those icons remain visible but inactive. WhatsApp uses `VITE_WHATSAPP_NUMBER`.
 

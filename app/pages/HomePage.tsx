@@ -54,7 +54,7 @@ export function HomePage() {
 
       <section className="collection-panels page-width" aria-label="Shop by condition">
         <Link to="/new" className="collection-panel collection-panel--new">
-          <img className="collection-panel__image" data-testid="new-collection-image" src="/brand/new-edit.png" alt="" />
+          <img className="collection-panel__image" data-testid="new-collection-image" src="/brand/new-edit.png" alt="" loading="lazy" decoding="async" />
           <div>
             <p className="eyebrow">Fresh from the edit</p>
             <h2>Shop New</h2>
@@ -63,7 +63,7 @@ export function HomePage() {
           </div>
         </Link>
         <Link to="/thrifted" className="collection-panel collection-panel--thrifted">
-          <img className="collection-panel__image" data-testid="thrifted-collection-image" src="/brand/thrifted-edit.png" alt="" />
+          <img className="collection-panel__image" data-testid="thrifted-collection-image" src="/brand/thrifted-edit.png" alt="" loading="lazy" decoding="async" />
           <div>
             <p className="eyebrow">One-of-one treasures</p>
             <h2>Shop Thrifted</h2>

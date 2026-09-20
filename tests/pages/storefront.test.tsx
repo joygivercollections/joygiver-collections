@@ -147,8 +147,14 @@ describe("Joygiver storefront", () => {
     renderAt("/");
 
     const panels = screen.getByRole("region", { name: /shop by condition/i });
-    expect(within(panels).getByTestId("new-collection-image")).toHaveAttribute("src", "/brand/new-edit.png");
-    expect(within(panels).getByTestId("thrifted-collection-image")).toHaveAttribute("src", "/brand/thrifted-edit.png");
+    const newImage = within(panels).getByTestId("new-collection-image");
+    const thriftedImage = within(panels).getByTestId("thrifted-collection-image");
+    expect(newImage).toHaveAttribute("src", "/brand/new-edit.png");
+    expect(thriftedImage).toHaveAttribute("src", "/brand/thrifted-edit.png");
+    expect(newImage).toHaveAttribute("loading", "lazy");
+    expect(thriftedImage).toHaveAttribute("loading", "lazy");
+    expect(newImage).toHaveAttribute("decoding", "async");
+    expect(thriftedImage).toHaveAttribute("decoding", "async");
     expect(within(panels).queryByText(/^0[12]$/)).not.toBeInTheDocument();
   });
 
