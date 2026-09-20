@@ -142,4 +142,25 @@ describe("Joygiver storefront", () => {
     expect(within(footer).getByLabelText(/tiktok/i)).toBeVisible();
     await waitFor(() => expect(within(footer).getByLabelText(/whatsapp/i)).toHaveAttribute("href", "https://wa.me/2348030000000"));
   });
+
+  it("uses local fashion imagery in the condition panels without numbered labels", async () => {
+    renderAt("/");
+
+    const panels = screen.getByRole("region", { name: /shop by condition/i });
+    expect(within(panels).getByTestId("new-collection-image")).toHaveAttribute("src", "/brand/new-edit.png");
+    expect(within(panels).getByTestId("thrifted-collection-image")).toHaveAttribute("src", "/brand/thrifted-edit.png");
+    expect(within(panels).queryByText(/^0[12]$/)).not.toBeInTheDocument();
+  });
+
+  it("sets the mobile page transition direction from collection order", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+
+    const collections = screen.getByRole("navigation", { name: /collections/i });
+    await user.click(within(collections).getByRole("link", { name: /new arrivals/i }));
+    expect(document.querySelector("main")).toHaveClass("page-transition--forward");
+
+    await user.click(within(collections).getByRole("link", { name: /^home$/i }));
+    expect(document.querySelector("main")).toHaveClass("page-transition--backward");
+  });
 });

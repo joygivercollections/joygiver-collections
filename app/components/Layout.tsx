@@ -1,5 +1,5 @@
-import { FormEvent, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../cart/cart-store";
 import { storeConfig } from "../config";
 import { MobileMenu } from "./MobileMenu";
@@ -9,8 +9,19 @@ export function Layout() {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const cart = useCart();
   const cartCount = cart.reduce((count, line) => count + line.quantity, 0);
+  const collectionRouteOrder: Record<string, number> = { "/": 0, "/new": 1, "/thrifted": 2 };
+  const currentRouteOrder = collectionRouteOrder[location.pathname];
+  const previousRouteOrder = useRef(currentRouteOrder);
+  const transitionDirection = currentRouteOrder === undefined || previousRouteOrder.current === undefined || currentRouteOrder === previousRouteOrder.current
+    ? ""
+    : currentRouteOrder > previousRouteOrder.current ? "forward" : "backward";
+
+  useEffect(() => {
+    previousRouteOrder.current = currentRouteOrder;
+  }, [currentRouteOrder]);
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
@@ -69,7 +80,7 @@ export function Layout() {
       </header>
       <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
 
-      <main id="main-content" tabIndex={-1}>
+      <main key={location.pathname} id="main-content" tabIndex={-1} className={transitionDirection ? `page-transition--${transitionDirection}` : undefined}>
         <Outlet />
       </main>
 
