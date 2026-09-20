@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import type { CategorySummary, CatalogueFilters } from "../../shared/contracts";
 
 interface FilterSheetProps {
@@ -17,15 +17,43 @@ export function FilterSheet({ open, categories, current, onClose, onApply }: Fil
   const [sort, setSort] = useState<CatalogueFilters["sort"]>(current.sort ?? "latest");
   const [minPrice, setMinPrice] = useState(current.minPriceKobo ? String(current.minPriceKobo / 100) : "");
   const [maxPrice, setMaxPrice] = useState(current.maxPriceKobo ? String(current.maxPriceKobo / 100) : "");
+  const sheetRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !sheetRef.current) return;
+      const focusable = Array.from(sheetRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [open, onClose]);
+    window.addEventListener("keydown", handleKeyboard);
+    return () => {
+      window.removeEventListener("keydown", handleKeyboard);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -54,13 +82,13 @@ export function FilterSheet({ open, categories, current, onClose, onApply }: Fil
     <div className="filter-overlay" onMouseDown={(event) => {
       if (event.currentTarget === event.target) onClose();
     }}>
-      <section className="filter-sheet" role="dialog" aria-modal="true" aria-labelledby="filter-title">
+      <section ref={sheetRef} className="filter-sheet" role="dialog" aria-modal="true" aria-labelledby="filter-title">
         <div className="filter-sheet__head">
           <div>
             <p className="eyebrow">Refine your edit</p>
             <h2 id="filter-title">Filter products</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Close filters">×</button>
+          <button ref={closeButtonRef} className="icon-button" type="button" onClick={onClose} aria-label="Close filters">×</button>
         </div>
         <form onSubmit={submit}>
           <fieldset>

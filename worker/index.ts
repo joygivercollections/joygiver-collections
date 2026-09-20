@@ -14,6 +14,22 @@ export interface Env {
 
 const app = new Hono<{ Bindings: Env }>();
 
+app.use("*", async (context, next) => {
+  await next();
+  context.header("X-Content-Type-Options", "nosniff");
+  context.header("X-Frame-Options", "DENY");
+  context.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  context.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  context.header("Cross-Origin-Opener-Policy", "same-origin");
+  context.header(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+  );
+  if (new URL(context.req.url).pathname.startsWith("/api/")) {
+    context.header("Cache-Control", "no-store");
+  }
+});
+
 app.get("/api/health", (context) =>
   context.json({ ok: true, service: "joygiver-collections" }),
 );

@@ -29,6 +29,7 @@ export function ProductForm() {
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState("");
   const [loading, setLoading] = useState(Boolean(id));
 
   useEffect(() => {
@@ -86,9 +87,11 @@ export function ProductForm() {
       const product = id ? await ownerApi.updateProduct(id, parsed.data) : await ownerApi.createProduct(parsed.data);
       const uploadErrors = [...localErrors];
       for (const file of files.filter((item) => !invalidFiles.includes(item))) {
+        setUploadingFile(file.name);
         try { await ownerApi.uploadImage(product.id, file); }
         catch { uploadErrors.push(`${file.name} could not be uploaded. The product was saved; try adding this image again.`); }
       }
+      setUploadingFile("");
       if (uploadErrors.length) {
         setErrors(uploadErrors);
         if (!id) setReference(product.reference);
@@ -97,7 +100,7 @@ export function ProductForm() {
       }
     } catch (caught) {
       setErrors([caught instanceof ApiRequestError ? caught.message : "Product could not be saved. Please try again."]);
-    } finally { setBusy(false); }
+    } finally { setUploadingFile(""); setBusy(false); }
   }
 
   async function deleteImage(image: ProductImage) {
@@ -142,6 +145,7 @@ export function ProductForm() {
         </section>
 
         <section className="form-card"><div className="form-card__heading"><span>03</span><div><h2>Store visibility</h2><p>Choose how this piece appears to customers.</p></div></div><div className="toggle-fields"><label><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /><span><strong>Published</strong><small>Visible on the storefront when available</small></span></label><label><input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} /><span><strong>Featured piece</strong><small>Available for highlighted placements</small></span></label></div></section>
+        {uploadingFile ? <p className="admin-notice" role="status">Uploading {uploadingFile}…</p> : null}
         <div className="product-form__actions"><Link className="button button--light" to="/owner/products">Cancel</Link><button className="button button--dark" type="submit" disabled={busy}>{busy ? "Saving…" : "Save product"}</button></div>
       </form>
     </main>

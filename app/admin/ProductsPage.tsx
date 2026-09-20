@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AdminProduct } from "../../shared/contracts";
 import { formatNaira, ownerApi } from "../api";
@@ -14,6 +14,8 @@ export function ProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminProduct | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [notice, setNotice] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  const confirmationRef = useRef<HTMLInputElement>(null);
 
   function load() {
     const controller = new AbortController();
@@ -25,6 +27,25 @@ export function ProductsPage() {
     return () => controller.abort();
   }
   useEffect(load, [query, condition, state]);
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    confirmationRef.current?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setDeleteTarget(null); return; }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => { window.removeEventListener("keydown", handleKey); document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
+  }, [deleteTarget]);
 
   function submitSearch(event: FormEvent) { event.preventDefault(); setQuery(search.trim()); }
 
@@ -71,7 +92,7 @@ export function ProductsPage() {
         {!loading && products.length === 0 ? <div className="admin-empty"><h2>No products found</h2><p>Try another filter or add the first product to this collection.</p></div> : null}
       </section>
 
-      {deleteTarget ? <div className="admin-dialog-backdrop"><section className="admin-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-title"><p className="eyebrow">Permanent action</p><h2 id="delete-title">Delete {deleteTarget.name}?</h2><p>This removes the product and all its images. It cannot be undone.</p><label>Type product reference <strong>{deleteTarget.reference}</strong><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoFocus /></label><div><button className="button button--light" type="button" onClick={() => setDeleteTarget(null)}>Cancel</button><button className="button button--danger" type="button" disabled={confirmation !== deleteTarget.reference} onClick={permanentlyDelete}>Delete permanently</button></div></section></div> : null}
+      {deleteTarget ? <div className="admin-dialog-backdrop"><section ref={dialogRef} className="admin-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-title"><p className="eyebrow">Permanent action</p><h2 id="delete-title">Delete {deleteTarget.name}?</h2><p>This removes the product and all its images. It cannot be undone.</p><label>Type product reference <strong>{deleteTarget.reference}</strong><input ref={confirmationRef} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label><div><button className="button button--light" type="button" onClick={() => setDeleteTarget(null)}>Cancel</button><button className="button button--danger" type="button" disabled={confirmation !== deleteTarget.reference} onClick={permanentlyDelete}>Delete permanently</button></div></section></div> : null}
     </main>
   );
 }

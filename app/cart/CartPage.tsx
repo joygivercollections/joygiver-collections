@@ -93,7 +93,7 @@ export function CartPage({ whatsAppNumber = storeConfig.whatsAppNumber }: { what
             <h2 className="sr-only" id="bag-items-title">Bag items</h2>
             <button type="button" onClick={() => setAllSelected(true)}>Select all</button>
             <button type="button" onClick={() => setAllSelected(false)}>Clear selection</button>
-            <p>{selected.length} selected</p>
+            <p aria-live="polite">{selected.length} selected</p>
           </div>
           <div className="cart-lines">
             {lines.map((line) => {
