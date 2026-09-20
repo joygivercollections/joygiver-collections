@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { getStoreConfig } from "../api";
 import { storeConfig } from "../config";
 
 type SocialName = "whatsapp" | "facebook" | "instagram" | "tiktok";
@@ -17,8 +19,19 @@ function SocialIcon({ name }: { name: SocialName }) {
 }
 
 export function SocialLinks({ className = "", whatsAppNumber = storeConfig.whatsAppNumber }: { className?: string; whatsAppNumber?: string }) {
+  const [resolvedWhatsAppNumber, setResolvedWhatsAppNumber] = useState(whatsAppNumber);
+
+  useEffect(() => {
+    if (resolvedWhatsAppNumber) return;
+    const controller = new AbortController();
+    getStoreConfig(controller.signal)
+      .then((config) => setResolvedWhatsAppNumber(config.whatsAppNumber))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [resolvedWhatsAppNumber]);
+
   const links: Array<{ name: SocialName; href: string }> = [
-    { name: "whatsapp", href: whatsAppNumber ? `https://wa.me/${whatsAppNumber.replace(/\D/g, "")}` : "" },
+    { name: "whatsapp", href: resolvedWhatsAppNumber ? `https://wa.me/${resolvedWhatsAppNumber.replace(/\D/g, "")}` : "" },
     { name: "facebook", href: storeConfig.socialLinks.facebook },
     { name: "instagram", href: storeConfig.socialLinks.instagram },
     { name: "tiktok", href: storeConfig.socialLinks.tiktok },

@@ -8,5 +8,7 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     exclude: ["tests/worker/**", "node_modules/**"],
     css: true,
+    // Keep jsdom interaction tests below their 5s limit on Windows hosts.
+    maxWorkers: 4,
   },
 });

@@ -48,6 +48,9 @@ beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input) => {
     const url = String(input);
+    if (url.includes("/api/config")) {
+      return okJson({ whatsAppNumber: "+234 803 000 0000" });
+    }
     if (url.includes("/categories")) {
       return okJson([
         { id: "mini-skirts", name: "Mini Skirts", slug: "mini-skirts" },
@@ -137,5 +140,6 @@ describe("Joygiver storefront", () => {
     const footer = screen.getByRole("contentinfo");
     expect(within(footer).getByLabelText(/facebook/i)).toBeVisible();
     expect(within(footer).getByLabelText(/tiktok/i)).toBeVisible();
+    await waitFor(() => expect(within(footer).getByLabelText(/whatsapp/i)).toHaveAttribute("href", "https://wa.me/2348030000000"));
   });
 });
