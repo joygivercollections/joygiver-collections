@@ -108,9 +108,34 @@ describe("Joygiver storefront", () => {
   it("offers labelled search and primary collection navigation", async () => {
     renderAt("/");
 
+    expect(screen.getAllByRole("searchbox")).toHaveLength(1);
     expect(screen.getByRole("searchbox", { name: /search the collection/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /^new$/i })).toHaveAttribute("href", "/new");
     expect(screen.getByRole("link", { name: /^thrifted$/i })).toHaveAttribute("href", "/thrifted");
+    expect(screen.getByRole("link", { name: /^about us$/i })).toHaveAttribute("href", "/about");
+    expect(screen.getByRole("link", { name: /^contact$/i })).toHaveAttribute("href", "/contact");
     expect(await screen.findByText(/latest arrivals/i)).toBeVisible();
+  });
+
+  it("opens a focused mobile menu with informational links and social icons", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+
+    await user.click(screen.getByRole("button", { name: /open menu/i }));
+    const menu = screen.getByRole("dialog", { name: /menu/i });
+    expect(within(menu).getByRole("link", { name: /about us/i })).toHaveAttribute("href", "/about");
+    expect(within(menu).getByRole("link", { name: /^contact$/i })).toHaveAttribute("href", "/contact");
+    expect(within(menu).getByLabelText(/instagram/i)).toBeVisible();
+    expect(within(menu).queryByRole("link", { name: /^new$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /close menu/i })).toHaveFocus();
+  });
+
+  it("uses file-based brand artwork and exposes social channels in the footer", async () => {
+    renderAt("/");
+
+    expect(screen.getByTestId("hero-brand-art")).toHaveAttribute("src", "/brand/hero-art.svg");
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByLabelText(/facebook/i)).toBeVisible();
+    expect(within(footer).getByLabelText(/tiktok/i)).toBeVisible();
   });
 });

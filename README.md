@@ -96,6 +96,12 @@ The owner signs in at `/owner/login`.
 - **Manage filters:** Categories lets the owner add, rename, reorder, or retire categories. A category with products cannot be retired until those products are reassigned.
 - **Change password:** Account → Change password. The current password is required, and all other sessions are revoked.
 
+## Brand files and social links
+
+The storefront logo and hero artwork are deliberately file-based so they can be replaced without changing page components. Overwrite `public/brand/logo.svg` and `public/brand/hero-art.svg` while keeping those filenames, or change their paths in `app/config.ts`.
+
+Add the store's Facebook, Instagram, and TikTok profile URLs in `app/config.ts`. Until real URLs are added, those icons remain visible but inactive. WhatsApp uses `VITE_WHATSAPP_NUMBER`.
+
 ## Production verification
 
 Run the read-only smoke check after every deployment:

@@ -11,6 +11,8 @@ import { ProductsPage } from "./admin/ProductsPage";
 import { ProductForm } from "./admin/ProductForm";
 import { CategoriesPage } from "./admin/CategoriesPage";
 import { AccountPage } from "./admin/AccountPage";
+import { AboutPage } from "./pages/AboutPage";
+import { ContactPage } from "./pages/ContactPage";
 
 export function App() {
   return (
@@ -31,6 +33,8 @@ export function App() {
         <Route path="search" element={<CataloguePage />} />
         <Route path="product/:slug" element={<ProductPage />} />
         <Route path="cart" element={<CartPage />} />
+        <Route path="about" element={<AboutPage />} />
+        <Route path="contact" element={<ContactPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

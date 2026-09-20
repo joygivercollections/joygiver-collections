@@ -1,16 +1,15 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { ProductSummary } from "../../shared/contracts";
 import { getProducts } from "../api";
 import { ProductGrid } from "../components/ProductGrid";
 import { RouteError } from "../components/RouteError";
+import { storeConfig } from "../config";
 
 export function HomePage() {
   const [products, setProducts] = useState<ProductSummary[] | null>(null);
   const [error, setError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
-  const [search, setSearch] = useState("");
-  const navigate = useNavigate();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -22,12 +21,6 @@ export function HomePage() {
       });
     return () => controller.abort();
   }, [retryKey]);
-
-  function searchCollection(event: FormEvent) {
-    event.preventDefault();
-    const value = search.trim();
-    navigate(value ? `/search?search=${encodeURIComponent(value)}` : "/search");
-  }
 
   return (
     <>
@@ -42,25 +35,8 @@ export function HomePage() {
           </div>
         </div>
         <div className="hero__art" aria-hidden="true">
-          <div className="hero__arch">
-            <span className="hero__letter">J</span>
-            <span className="hero__line hero__line--one" />
-            <span className="hero__line hero__line--two" />
-          </div>
-          <p>Curated in Abuja</p>
+          <img data-testid="hero-brand-art" src={storeConfig.heroArtUrl} alt="" />
         </div>
-      </section>
-
-      <section className="discovery page-width" aria-labelledby="find-title">
-        <div>
-          <p className="eyebrow">Find your next favourite</p>
-          <h2 id="find-title">What are you looking for?</h2>
-        </div>
-        <form className="discovery__search" role="search" onSubmit={searchCollection}>
-          <label className="sr-only" htmlFor="home-search">Search all clothes</label>
-          <input id="home-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Try ‘maxi gown’ or ‘crop top’" />
-          <button className="button button--gold" type="submit">Search collection</button>
-        </form>
       </section>
 
       <section className="latest-section page-width" aria-labelledby="latest-title">

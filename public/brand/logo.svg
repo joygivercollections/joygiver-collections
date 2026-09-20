@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 56" role="img" aria-labelledby="title">
+  <title id="title">Joygiver Collections</title>
+  <g fill="#22211f">
+    <circle cx="27" cy="28" r="24" fill="none" stroke="#b79a64" stroke-width="1"/>
+    <text x="27" y="38" text-anchor="middle" font-family="Georgia,serif" font-size="32" font-style="italic">J</text>
+    <text x="64" y="28" font-family="Arial,Helvetica,sans-serif" font-size="20" font-weight="800" letter-spacing="1.1">JOYGIVER</text>
+    <text x="65" y="43" font-family="Arial,Helvetica,sans-serif" font-size="8" font-weight="600" letter-spacing="4.2">COLLECTIONS</text>
+  </g>
+</svg>

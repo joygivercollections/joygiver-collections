@@ -1,9 +1,13 @@
 import { FormEvent, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useCart } from "../cart/cart-store";
+import { storeConfig } from "../config";
+import { MobileMenu } from "./MobileMenu";
+import { SocialLinks } from "./SocialLinks";
 
 export function Layout() {
   const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const cart = useCart();
   const cartCount = cart.reduce((count, line) => count + line.quantity, 0);
@@ -23,18 +27,24 @@ export function Layout() {
       <header className="site-header">
         <div className="site-header__top page-width">
           <NavLink className="wordmark" to="/" aria-label="Joygiver Collections home">
-            <span className="wordmark__monogram" aria-hidden="true">J</span>
-            <span className="wordmark__text">Joygiver <small>Collections</small></span>
+            <img className="wordmark__image" src={storeConfig.logoUrl} alt="" />
           </NavLink>
           <nav className="desktop-nav" aria-label="Primary navigation">
             <NavLink to="/">Home</NavLink>
             <NavLink to="/new">New</NavLink>
             <NavLink to="/thrifted">Thrifted</NavLink>
+            <NavLink to="/about">About Us</NavLink>
+            <NavLink to="/contact">Contact</NavLink>
           </nav>
-          <NavLink className="cart-link" to="/cart" aria-label={`Shopping bag, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}>
-            <span aria-hidden="true">Bag</span>
-            <span className="cart-link__count">{cartCount}</span>
-          </NavLink>
+          <div className="header-actions">
+            <NavLink className="cart-link" to="/cart" aria-label={`Shopping bag, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}>
+              <span aria-hidden="true">Bag</span>
+              <span className="cart-link__count">{cartCount}</span>
+            </NavLink>
+            <button className="menu-button" type="button" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
+              <span /><span /><span />
+            </button>
+          </div>
         </div>
         <div className="site-header__search page-width">
           <form className="search-form" role="search" onSubmit={submitSearch}>
@@ -57,6 +67,7 @@ export function Layout() {
           <NavLink to="/thrifted">Thrifted finds</NavLink>
         </nav>
       </header>
+      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
 
       <main id="main-content" tabIndex={-1}>
         <Outlet />
@@ -76,6 +87,10 @@ export function Layout() {
           <div>
             <p className="eyebrow">Delivery</p>
             <p>Abuja pickup and delivery across Nigeria. Final delivery cost is confirmed on WhatsApp.</p>
+          </div>
+          <div>
+            <p className="eyebrow">Follow &amp; order</p>
+            <SocialLinks className="footer-socials" />
           </div>
         </div>
         <div className="page-width site-footer__bottom">
