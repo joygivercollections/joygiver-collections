@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { InvalidCartReason, ValidatedCart, ValidatedCartLine } from "../../shared/contracts";
-import { formatNaira, validateCart } from "../api";
+import { formatNaira, getStoreConfig, validateCart } from "../api";
 import { storeConfig } from "../config";
 import { removeCartLine, saveCart, setAllSelected, setQuantity, setSelected, useCart } from "./cart-store";
 import { buildWhatsAppMessage, buildWhatsAppUrl } from "./whatsapp";
@@ -15,15 +15,23 @@ const invalidMessages: Record<InvalidCartReason, string> = {
   quantity_reduced: "The available quantity has changed.",
 };
 
-export function CartPage({ whatsAppNumber = storeConfig.whatsAppNumber }: { whatsAppNumber?: string }) {
+export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
   const lines = useCart();
   const [customerName, setCustomerName] = useState("");
   const [deliveryLocation, setDeliveryLocation] = useState("");
   const [validation, setValidation] = useState<ValidatedCart>({ valid: [], invalid: [], subtotalKobo: 0 });
   const [checking, setChecking] = useState(false);
   const [validationError, setValidationError] = useState(false);
+  const [resolvedWhatsAppNumber, setResolvedWhatsAppNumber] = useState(whatsAppNumber ?? storeConfig.whatsAppNumber);
   const selected = useMemo(() => lines.filter((line) => line.selected), [lines]);
   const validationKey = selected.map((line) => `${line.productId}:${line.size}:${line.quantity}:${line.lastKnownPriceKobo}`).join("|");
+
+  useEffect(() => {
+    if (whatsAppNumber || resolvedWhatsAppNumber) return;
+    const controller = new AbortController();
+    getStoreConfig(controller.signal).then((config) => setResolvedWhatsAppNumber(config.whatsAppNumber)).catch(() => undefined);
+    return () => controller.abort();
+  }, [whatsAppNumber, resolvedWhatsAppNumber]);
 
   useEffect(() => {
     if (selected.length === 0) {
@@ -66,7 +74,7 @@ export function CartPage({ whatsAppNumber = storeConfig.whatsAppNumber }: { what
   const validatedItems = validation.valid.filter((line) => lines.some((item) => item.productId === line.productId && item.size === line.size && item.selected));
   const subtotalKobo = validatedItems.reduce((total, item) => total + item.canonicalPriceKobo * item.quantity, 0);
   const message = buildWhatsAppMessage({ customerName, deliveryLocation, items: validatedItems, subtotalKobo });
-  const whatsAppUrl = whatsAppNumber ? buildWhatsAppUrl(whatsAppNumber, message) : "";
+  const whatsAppUrl = resolvedWhatsAppNumber ? buildWhatsAppUrl(resolvedWhatsAppNumber, message) : "";
   const ready = validatedItems.length > 0 && !checking && !validationError && Boolean(whatsAppUrl);
 
   if (lines.length === 0) {
@@ -140,7 +148,7 @@ export function CartPage({ whatsAppNumber = storeConfig.whatsAppNumber }: { what
           <label>Your name <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="e.g. Ada" autoComplete="name" /></label>
           <label>Delivery location <input value={deliveryLocation} onChange={(event) => setDeliveryLocation(event.target.value)} placeholder="Area, city and state" autoComplete="street-address" /></label>
           {validationError ? <p className="summary-error" role="alert">We couldn’t confirm availability. Check your connection and try changing your selection.</p> : null}
-          {!whatsAppNumber ? <p className="summary-error" role="status">The store WhatsApp number needs to be configured before orders can be sent.</p> : null}
+          {!resolvedWhatsAppNumber ? <p className="summary-error" role="status">The store WhatsApp number needs to be configured before orders can be sent.</p> : null}
           {ready ? (
             <a className="button button--whatsapp" href={whatsAppUrl} target="_blank" rel="noreferrer">
               Order {validatedItems.length} selected {validatedItems.length === 1 ? "item" : "items"} on WhatsApp

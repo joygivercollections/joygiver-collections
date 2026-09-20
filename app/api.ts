@@ -81,6 +81,10 @@ export function getCategories(signal?: AbortSignal) {
   return requestJson<CategorySummary[]>("/api/categories", signal);
 }
 
+export function getStoreConfig(signal?: AbortSignal) {
+  return requestJson<{ whatsAppNumber: string }>("/api/config", signal);
+}
+
 export function validateCart(lines: import("../shared/contracts").CartLine[], signal?: AbortSignal) {
   return requestJson<import("../shared/contracts").ValidatedCart>("/api/cart/validate", signal, {
     method: "POST",

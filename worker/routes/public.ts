@@ -6,6 +6,7 @@ import { getPublicProduct, listPublicProducts, validateCart } from "../db/produc
 
 interface PublicBindings {
   DB: D1Database;
+  WHATSAPP_NUMBER: string;
 }
 
 const optionalTrimmed = z.preprocess(
@@ -40,6 +41,12 @@ const catalogueQuerySchema = z
   });
 
 export const publicRoutes = new Hono<{ Bindings: PublicBindings }>();
+
+publicRoutes.get("/config", (context) =>
+  context.json({
+    whatsAppNumber: (context.env.WHATSAPP_NUMBER ?? "").replace(/\D/g, ""),
+  }),
+);
 
 publicRoutes.get("/categories", async (context) => {
   return context.json(await listActiveCategories(context.env.DB));
