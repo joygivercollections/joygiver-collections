@@ -4,10 +4,26 @@ import { CartPage } from "./cart/CartPage";
 import { CataloguePage } from "./pages/CataloguePage";
 import { HomePage } from "./pages/HomePage";
 import { ProductPage } from "./pages/ProductPage";
+import { LoginPage } from "./admin/LoginPage";
+import { AdminLayout } from "./admin/AdminLayout";
+import { DashboardPage } from "./admin/DashboardPage";
+import { ProductsPage } from "./admin/ProductsPage";
+import { ProductForm } from "./admin/ProductForm";
+import { CategoriesPage } from "./admin/CategoriesPage";
+import { AccountPage } from "./admin/AccountPage";
 
 export function App() {
   return (
     <Routes>
+      <Route path="owner/login" element={<LoginPage />} />
+      <Route path="owner" element={<AdminLayout />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="products" element={<ProductsPage />} />
+        <Route path="products/new" element={<ProductForm />} />
+        <Route path="products/:id" element={<ProductForm />} />
+        <Route path="categories" element={<CategoriesPage />} />
+        <Route path="account" element={<AccountPage />} />
+      </Route>
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="new" element={<CataloguePage condition="new" />} />

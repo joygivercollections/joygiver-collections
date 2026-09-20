@@ -5,19 +5,26 @@ import type {
   Paginated,
   Product,
   ProductSummary,
+  AdminCategory,
+  AdminProduct,
+  InventorySummary,
+  ProductImage,
 } from "../shared/contracts";
+import type { ProductInput } from "../shared/validation";
 
 export class ApiRequestError extends Error implements ApiError {
   readonly status: number;
   readonly code: string;
   readonly fieldErrors?: Record<string, string[]>;
+  readonly productCount?: number;
 
-  constructor(error: ApiError) {
+  constructor(error: ApiError & { productCount?: number }) {
     super(error.message);
     this.name = "ApiRequestError";
     this.status = error.status;
     this.code = error.code;
     this.fieldErrors = error.fieldErrors;
+    this.productCount = error.productCount;
   }
 }
 
@@ -29,7 +36,7 @@ async function requestJson<T>(path: string, signal?: AbortSignal, init?: Request
   });
 
   if (!response.ok) {
-    let body: Partial<ApiError> = {};
+    let body: Partial<ApiError> & { productCount?: number } = {};
     try {
       body = (await response.json()) as Partial<ApiError>;
     } catch {
@@ -40,9 +47,11 @@ async function requestJson<T>(path: string, signal?: AbortSignal, init?: Request
       code: body.code ?? "request_failed",
       message: body.message ?? "We could not complete that request. Please try again.",
       fieldErrors: body.fieldErrors,
+      productCount: body.productCount,
     });
   }
 
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -87,3 +96,44 @@ export function formatNaira(priceKobo: number): string {
     maximumFractionDigits: 0,
   }).format(priceKobo / 100);
 }
+
+function jsonRequest(method: string, body?: unknown): RequestInit {
+  return {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  };
+}
+
+export interface OwnerSession { id: string; email: string }
+
+export const ownerApi = {
+  session: (signal?: AbortSignal) => requestJson<OwnerSession>("/api/auth/session", signal),
+  login: (email: string, password: string, signal?: AbortSignal) => requestJson<OwnerSession>("/api/auth/login", signal, jsonRequest("POST", { email, password })),
+  logout: () => requestJson<void>("/api/auth/logout", undefined, jsonRequest("POST")),
+  changePassword: (currentPassword: string, newPassword: string) => requestJson<{ ok: true }>("/api/auth/password", undefined, jsonRequest("PUT", { currentPassword, newPassword })),
+  summary: (signal?: AbortSignal) => requestJson<InventorySummary>("/api/admin/summary", signal),
+  products: (filters: Record<string, string | undefined> = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
+    return requestJson<Paginated<AdminProduct>>(`/api/admin/products?${query}`, signal);
+  },
+  product: (id: string, signal?: AbortSignal) => requestJson<AdminProduct>(`/api/admin/products/${encodeURIComponent(id)}`, signal),
+  createProduct: (input: ProductInput) => requestJson<AdminProduct>("/api/admin/products", undefined, jsonRequest("POST", input)),
+  updateProduct: (id: string, input: ProductInput) => requestJson<AdminProduct>(`/api/admin/products/${encodeURIComponent(id)}`, undefined, jsonRequest("PUT", input)),
+  setProductState: (id: string, state: "available" | "sold" | "hidden") => requestJson<AdminProduct>(`/api/admin/products/${encodeURIComponent(id)}/state`, undefined, jsonRequest("PUT", { state })),
+  deleteProduct: (id: string, confirmReference: string) => requestJson<void>(`/api/admin/products/${encodeURIComponent(id)}`, undefined, jsonRequest("DELETE", { confirmReference })),
+  categories: (signal?: AbortSignal) => requestJson<AdminCategory[]>("/api/admin/categories", signal),
+  createCategory: (input: { name: string; displayOrder: number; active: boolean }) => requestJson<AdminCategory>("/api/admin/categories", undefined, jsonRequest("POST", input)),
+  updateCategory: (id: string, input: { name: string; displayOrder: number; active: boolean }) => requestJson<AdminCategory>(`/api/admin/categories/${encodeURIComponent(id)}`, undefined, jsonRequest("PUT", input)),
+  retireCategory: (id: string) => requestJson<void>(`/api/admin/categories/${encodeURIComponent(id)}`, undefined, { method: "DELETE" }),
+  uploadImage: async (productId: string, file: File): Promise<ProductImage> => {
+    const body = new FormData();
+    body.append("images", file);
+    body.append("altText", file.name.replace(/\.[^.]+$/, ""));
+    const result = await requestJson<{ images: ProductImage[] }>(`/api/admin/products/${encodeURIComponent(productId)}/images`, undefined, { method: "POST", body });
+    return result.images[0];
+  },
+  deleteImage: (productId: string, imageId: string) => requestJson<void>(`/api/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`, undefined, { method: "DELETE" }),
+  reorderImages: (productId: string, imageIds: string[]) => requestJson<{ images: ProductImage[] }>(`/api/admin/products/${encodeURIComponent(productId)}/images/order`, undefined, jsonRequest("PUT", { imageIds })),
+};
