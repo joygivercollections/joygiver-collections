@@ -11,6 +11,13 @@ import type {
   ValidatedCart,
 } from "../../shared/contracts";
 import type { ProductInput } from "../../shared/validation";
+import {
+  deleteRegisteredImage,
+  ImageStorageError,
+  imageUrl,
+  reorderRegisteredImages,
+  storeRegisteredImage,
+} from "../lib/images";
 
 const SOLD_VISIBILITY_MS = 48 * 60 * 60 * 1_000;
 
@@ -56,13 +63,6 @@ function parseStringArray(value: string): string[] {
     throw new Error("Stored product list is invalid");
   }
   return parsed;
-}
-
-function imageUrl(objectKey: string): string {
-  return `/media/${objectKey
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/")}`;
 }
 
 function mapSummary(row: ProductRow): ProductSummary {
@@ -752,43 +752,7 @@ export async function validateCart(
   };
 }
 
-export class ProductImageError extends Error {
-  constructor(
-    public readonly code: string,
-    public readonly status: 413 | 415 | 409 | 503,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-function detectImageType(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return "image/jpeg";
-  }
-  if (
-    bytes.length >= 8 &&
-    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every(
-      (value, index) => bytes[index] === value,
-    )
-  ) {
-    return "image/png";
-  }
-  if (
-    bytes.length >= 12 &&
-    String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
-  ) {
-    return "image/webp";
-  }
-  return null;
-}
-
-function extensionFor(type: "image/jpeg" | "image/png" | "image/webp"): string {
-  if (type === "image/jpeg") return "jpg";
-  if (type === "image/png") return "png";
-  return "webp";
-}
+export { ImageStorageError as ProductImageError };
 
 export async function storeProductImage(
   db: D1Database,
@@ -797,84 +761,7 @@ export async function storeProductImage(
   file: File,
   altText?: string,
 ): Promise<ProductImage> {
-  if (file.size > 8 * 1_024 * 1_024) {
-    throw new ProductImageError("image_too_large", 413, "Each image must be 8 MiB or smaller");
-  }
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    throw new ProductImageError("unsupported_image_type", 415, "Use a JPEG, PNG, or WebP image");
-  }
-  const detected = detectImageType(new Uint8Array(await file.slice(0, 12).arrayBuffer()));
-  if (!detected || detected !== file.type) {
-    throw new ProductImageError("unsupported_image_type", 415, "Image contents do not match the file type");
-  }
-  const product = await productRowById(db, productId);
-  if (!product) throw new Error("PRODUCT_NOT_FOUND");
-  const count =
-    (await db
-      .prepare("SELECT COUNT(*) AS total FROM product_images WHERE product_id = ?")
-      .bind(productId)
-      .first<number>("total")) ?? 0;
-  if (count >= 6) {
-    throw new ProductImageError("image_limit_reached", 409, "A product can have at most six images");
-  }
-
-  const id = crypto.randomUUID();
-  const objectKey = `products/${productId}/${crypto.randomUUID()}.${extensionFor(detected)}`;
-  try {
-    await bucket.put(objectKey, file.stream(), {
-      httpMetadata: { contentType: detected },
-    });
-  } catch {
-    throw new ProductImageError("image_storage_unavailable", 503, "Image storage is temporarily unavailable");
-  }
-
-  const timestamp = new Date().toISOString();
-  try {
-    await db
-      .prepare(
-        `INSERT INTO product_images
-         (id, product_id, object_key, alt_text, content_type, display_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        productId,
-        objectKey,
-        altText?.trim() || product.name,
-        detected,
-        count,
-        timestamp,
-        timestamp,
-      )
-      .run();
-  } catch (error) {
-    await bucket.delete(objectKey).catch(() => undefined);
-    throw error;
-  }
-  return {
-    id,
-    url: imageUrl(objectKey),
-    alt: altText?.trim() || product.name,
-    displayOrder: count,
-  };
-}
-
-export async function findRegisteredImage(
-  db: D1Database,
-  objectKey: string,
-): Promise<{ id: string; objectKey: string; contentType: string } | null> {
-  const row = await db
-    .prepare(
-      `SELECT id, object_key, content_type
-       FROM product_images
-       WHERE object_key = ?
-       LIMIT 1`,
-    )
-    .bind(objectKey)
-    .first<{ id: string; object_key: string; content_type: string }>();
-  return row
-    ? { id: row.id, objectKey: row.object_key, contentType: row.content_type }
-    : null;
+  return storeRegisteredImage(db, bucket, { ownerType: "product", ownerId: productId }, file, altText);
 }
 
 export async function deleteProductImage(
@@ -883,21 +770,7 @@ export async function deleteProductImage(
   productId: string,
   imageId: string,
 ): Promise<boolean> {
-  const row = await db
-    .prepare(
-      `SELECT object_key FROM product_images
-       WHERE id = ? AND product_id = ?`,
-    )
-    .bind(imageId, productId)
-    .first<{ object_key: string }>();
-  if (!row) return false;
-  try {
-    await bucket.delete(row.object_key);
-  } catch {
-    throw new ProductImageError("image_storage_unavailable", 503, "Image storage is temporarily unavailable");
-  }
-  await db.prepare("DELETE FROM product_images WHERE id = ?").bind(imageId).run();
-  return true;
+  return deleteRegisteredImage(db, bucket, { ownerType: "product", ownerId: productId }, imageId);
 }
 
 export async function reorderProductImages(
@@ -905,25 +778,5 @@ export async function reorderProductImages(
   productId: string,
   imageIds: string[],
 ): Promise<ProductImage[] | null> {
-  const current = await db
-    .prepare("SELECT id FROM product_images WHERE product_id = ? ORDER BY display_order, id")
-    .bind(productId)
-    .all<{ id: string }>();
-  const currentIds = current.results.map((row) => row.id).sort();
-  if (
-    currentIds.length !== imageIds.length ||
-    currentIds.some((id, index) => id !== [...imageIds].sort()[index])
-  ) {
-    return null;
-  }
-  await db.batch(
-    imageIds.map((id, index) =>
-      db
-        .prepare(
-          "UPDATE product_images SET display_order = ?, updated_at = ? WHERE id = ? AND product_id = ?",
-        )
-        .bind(index, new Date().toISOString(), id, productId),
-    ),
-  );
-  return listProductImages(db, productId);
+  return reorderRegisteredImages(db, { ownerType: "product", ownerId: productId }, imageIds);
 }
