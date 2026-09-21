@@ -35,7 +35,7 @@ export function ProductPage() {
     <div className="product-detail page-width">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <Link to="/">Home</Link><span aria-hidden="true">/</span>
-        <Link to={`/${product.condition}`}>{product.condition === "new" ? "New" : "Thrifted"}</Link><span aria-hidden="true">/</span>
+        <Link to={`/${product.condition}/${product.audiences[0] ?? "women"}`}>{product.condition === "new" ? "New" : "Thrifted"}</Link><span aria-hidden="true">/</span>
         <span>{product.name}</span>
       </nav>
       <div className="product-detail__grid">
@@ -47,9 +47,11 @@ export function ProductPage() {
         <section className="product-info">
           <div className="product-info__badges">
             <span className={`condition-badge condition-badge--${product.condition}`}>{product.condition === "new" ? "New" : "Thrifted"}</span>
+            {product.isUnisex ? <span className="condition-badge condition-badge--unisex">Unisex</span> : null}
             {sold ? <span className="condition-badge condition-badge--sold">Sold</span> : null}
           </div>
           <p className="eyebrow">{product.category.name} · {product.reference}</p>
+          <p className="product-info__audience">For {product.audiences.map((audience) => audience === "kids" ? "Kids" : audience[0].toUpperCase() + audience.slice(1)).join(" and ")}</p>
           <h1>{product.name}</h1>
           <p className="product-info__price">{formatNaira(product.priceKobo)}</p>
           <p className="product-info__description">{product.description}</p>
@@ -63,6 +65,7 @@ export function ProductPage() {
           <button className="button button--dark product-info__add" type="button" disabled={sold || !selectedSize} onClick={() => {
             if (!selectedSize) return;
             upsertCartLine({
+              itemType: "retail",
               productId: product.id,
               reference: product.reference,
               name: product.name,

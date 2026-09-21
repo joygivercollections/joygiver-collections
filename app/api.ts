@@ -9,6 +9,7 @@ import type {
   AdminProduct,
   InventorySummary,
   ProductImage,
+  Audience,
 } from "../shared/contracts";
 import type { ProductInput } from "../shared/validation";
 
@@ -58,6 +59,7 @@ async function requestJson<T>(path: string, signal?: AbortSignal, init?: Request
 export function buildProductQuery(filters: CatalogueFilters): string {
   const query = new URLSearchParams();
   if (filters.condition) query.set("condition", filters.condition);
+  if (filters.audience) query.set("audience", filters.audience);
   if (filters.category) query.set("category", filters.category);
   if (filters.size) query.set("size", filters.size);
   if (filters.minPriceKobo !== undefined) query.set("minPriceKobo", String(filters.minPriceKobo));
@@ -77,8 +79,9 @@ export function getProduct(slug: string, signal?: AbortSignal) {
   return requestJson<Product>(`/api/products/${encodeURIComponent(slug)}`, signal);
 }
 
-export function getCategories(signal?: AbortSignal) {
-  return requestJson<CategorySummary[]>("/api/categories", signal);
+export function getCategories(audience?: Audience, signal?: AbortSignal) {
+  const query = audience ? `?audience=${encodeURIComponent(audience)}` : "";
+  return requestJson<CategorySummary[]>(`/api/categories${query}`, signal);
 }
 
 export function getStoreConfig(signal?: AbortSignal) {
@@ -128,8 +131,8 @@ export const ownerApi = {
   setProductState: (id: string, state: "available" | "sold" | "hidden") => requestJson<AdminProduct>(`/api/admin/products/${encodeURIComponent(id)}/state`, undefined, jsonRequest("PUT", { state })),
   deleteProduct: (id: string, confirmReference: string) => requestJson<void>(`/api/admin/products/${encodeURIComponent(id)}`, undefined, jsonRequest("DELETE", { confirmReference })),
   categories: (signal?: AbortSignal) => requestJson<AdminCategory[]>("/api/admin/categories", signal),
-  createCategory: (input: { name: string; displayOrder: number; active: boolean }) => requestJson<AdminCategory>("/api/admin/categories", undefined, jsonRequest("POST", input)),
-  updateCategory: (id: string, input: { name: string; displayOrder: number; active: boolean }) => requestJson<AdminCategory>(`/api/admin/categories/${encodeURIComponent(id)}`, undefined, jsonRequest("PUT", input)),
+  createCategory: (input: { name: string; displayOrder: number; active: boolean; audiences: Audience[] }) => requestJson<AdminCategory>("/api/admin/categories", undefined, jsonRequest("POST", input)),
+  updateCategory: (id: string, input: { name: string; displayOrder: number; active: boolean; audiences: Audience[] }) => requestJson<AdminCategory>(`/api/admin/categories/${encodeURIComponent(id)}`, undefined, jsonRequest("PUT", input)),
   retireCategory: (id: string) => requestJson<void>(`/api/admin/categories/${encodeURIComponent(id)}`, undefined, { method: "DELETE" }),
   uploadImage: async (productId: string, file: File): Promise<ProductImage> => {
     const body = new FormData();

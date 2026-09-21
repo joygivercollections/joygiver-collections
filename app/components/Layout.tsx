@@ -12,16 +12,19 @@ export function Layout() {
   const location = useLocation();
   const cart = useCart();
   const cartCount = cart.reduce((count, line) => count + line.quantity, 0);
-  const collectionRouteOrder: Record<string, number> = { "/": 0, "/new": 1, "/thrifted": 2 };
-  const currentRouteOrder = collectionRouteOrder[location.pathname];
+  const currentRouteOrder = location.pathname === "/" ? 0
+    : location.pathname.startsWith("/new") ? 1
+      : location.pathname.startsWith("/thrifted") ? 2
+        : undefined;
   const previousRouteOrder = useRef(currentRouteOrder);
   const transitionDirection = currentRouteOrder === undefined || previousRouteOrder.current === undefined || currentRouteOrder === previousRouteOrder.current
     ? ""
     : currentRouteOrder > previousRouteOrder.current ? "forward" : "backward";
 
   useEffect(() => {
-    previousRouteOrder.current = currentRouteOrder;
-  }, [currentRouteOrder]);
+    const isRedirectRoot = location.pathname === "/new" || location.pathname === "/thrifted";
+    if (!isRedirectRoot) previousRouteOrder.current = currentRouteOrder;
+  }, [currentRouteOrder, location.pathname]);
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();

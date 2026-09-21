@@ -28,8 +28,10 @@ export function App() {
       </Route>
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
-        <Route path="new" element={<CataloguePage condition="new" />} />
-        <Route path="thrifted" element={<CataloguePage condition="thrifted" />} />
+        <Route path="new" element={<Navigate to="/new/women" replace />} />
+        <Route path="new/:audience" element={<CataloguePage condition="new" />} />
+        <Route path="thrifted" element={<Navigate to="/thrifted/women" replace />} />
+        <Route path="thrifted/:audience" element={<CataloguePage condition="thrifted" />} />
         <Route path="search" element={<CataloguePage />} />
         <Route path="product/:slug" element={<ProductPage />} />
         <Route path="cart" element={<CartPage />} />

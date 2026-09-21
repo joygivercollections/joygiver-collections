@@ -29,6 +29,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <span className={`condition-badge condition-badge--${product.condition}`}>
             {product.condition === "new" ? "New" : "Thrifted"}
           </span>
+          {product.isUnisex ? <span className="condition-badge condition-badge--unisex">Unisex</span> : null}
           {sold ? <span className="sold-stamp">Sold</span> : null}
         </div>
       </Link>
@@ -44,6 +45,7 @@ export function ProductCard({ product }: ProductCardProps) {
       </p>
       {!sold && product.sizes.length === 1 ? (
         <button className="product-card__quick-add" type="button" onClick={() => upsertCartLine({
+          itemType: "retail",
           productId: product.id,
           reference: product.reference,
           name: product.name,

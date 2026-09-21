@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AdminProduct } from "../../shared/contracts";
+import type { AdminProduct, Audience } from "../../shared/contracts";
 import { formatNaira, ownerApi } from "../api";
 
 export function ProductsPage() {
@@ -10,6 +10,7 @@ export function ProductsPage() {
   const [query, setQuery] = useState("");
   const [condition, setCondition] = useState("");
   const [state, setState] = useState("");
+  const [audience, setAudience] = useState<Audience | "">("");
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<AdminProduct | null>(null);
   const [confirmation, setConfirmation] = useState("");
@@ -20,13 +21,13 @@ export function ProductsPage() {
   function load() {
     const controller = new AbortController();
     setLoading(true);
-    ownerApi.products({ search: query || undefined, condition: condition || undefined, state: state || undefined }, controller.signal)
+    ownerApi.products({ search: query || undefined, condition: condition || undefined, state: state || undefined, audience: audience || undefined }, controller.signal)
       .then((result) => { setProducts(result.items); setTotal(result.total); })
       .catch(() => setNotice("Inventory could not be loaded. Please try again."))
       .finally(() => setLoading(false));
     return () => controller.abort();
   }
-  useEffect(load, [query, condition, state]);
+  useEffect(load, [query, condition, state, audience]);
   useEffect(() => {
     if (!deleteTarget) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -72,6 +73,7 @@ export function ProductsPage() {
       <section className="inventory-tools" aria-label="Inventory filters">
         <form role="search" onSubmit={submitSearch}><label className="sr-only" htmlFor="inventory-search">Search inventory</label><input id="inventory-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or reference" /><button type="submit">Search</button></form>
         <select aria-label="Filter by condition" value={condition} onChange={(event) => setCondition(event.target.value)}><option value="">All conditions</option><option value="new">New</option><option value="thrifted">Thrifted</option></select>
+        <select aria-label="Filter by audience" value={audience} onChange={(event) => setAudience(event.target.value as Audience | "")}><option value="">All audiences</option><option value="women">Women</option><option value="men">Men</option><option value="kids">Kids</option></select>
         <select aria-label="Filter by status" value={state} onChange={(event) => setState(event.target.value)}><option value="">All statuses</option><option value="available">Available</option><option value="sold">Sold</option><option value="hidden">Hidden</option></select>
       </section>
       <div className="inventory-count"><p>{loading ? "Loading inventory…" : `${total} ${total === 1 ? "product" : "products"}`}</p></div>
@@ -79,7 +81,7 @@ export function ProductsPage() {
         {products.map((product) => (
           <article className="inventory-row" key={product.id}>
             <div className="inventory-row__image">{product.primaryImage ? <img src={product.primaryImage.url} alt="" /> : <span>J</span>}</div>
-            <div className="inventory-row__main"><div className="inventory-row__badges"><span>{product.condition}</span><span className={`status status--${product.state}`}>{product.state}</span>{!product.published ? <span>draft</span> : null}</div><h2>{product.name}</h2><p>{product.reference} · {product.category.name}</p></div>
+            <div className="inventory-row__main"><div className="inventory-row__badges"><span>{product.condition}</span>{product.isUnisex ? <span>Unisex</span> : null}<span className={`status status--${product.state}`}>{product.state}</span>{!product.published ? <span>draft</span> : null}</div><h2>{product.name}</h2><p>{product.reference} · {product.category.name} · {product.audiences.join(", ")}</p></div>
             <div className="inventory-row__stock"><strong>{formatNaira(product.priceKobo)}</strong><span>{product.stockQuantity} in stock</span></div>
             <div className="inventory-row__actions">
               <Link to={`/owner/products/${product.id}`}>Edit</Link>

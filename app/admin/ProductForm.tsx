@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { AdminCategory, AdminProduct, ProductCondition, ProductImage } from "../../shared/contracts";
+import type { AdminCategory, AdminProduct, Audience, ProductCondition, ProductImage } from "../../shared/contracts";
 import { productInputSchema, type ProductInput } from "../../shared/validation";
 import { ApiRequestError, ownerApi } from "../api";
 
@@ -25,6 +25,8 @@ export function ProductForm() {
   const [reference, setReference] = useState("");
   const [featured, setFeatured] = useState(false);
   const [published, setPublished] = useState(true);
+  const [audiences, setAudiences] = useState<Audience[]>([]);
+  const [isUnisex, setIsUnisex] = useState(false);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -48,10 +50,15 @@ export function ProductForm() {
     setName(product.name); setDescription(product.description); setPrice(String(product.priceKobo / 100)); setCondition(product.condition);
     setCategoryId(product.category.id); setSizes(product.sizes); setTags(product.tags.join(", ")); setStock(String(product.stockQuantity));
     setReference(product.reference); setFeatured(product.featured); setPublished(product.published); setImages(product.images);
+    setAudiences(product.audiences); setIsUnisex(product.isUnisex);
   }
 
   function toggleSize(size: string) {
     setSizes((items) => items.includes(size) ? items.filter((item) => item !== size) : [...items, size]);
+  }
+
+  function toggleAudience(audience: Audience) {
+    setAudiences((items) => items.includes(audience) ? items.filter((item) => item !== audience) : [...items, audience]);
   }
 
   function selectFiles(selected: FileList | null) {
@@ -64,6 +71,7 @@ export function ProductForm() {
     event.preventDefault();
     setErrors([]);
     const localErrors: string[] = [];
+    if (audiences.length === 0) localErrors.push("Choose at least one audience.");
     if (!categoryId) localErrors.push("Choose a category.");
     if (sizes.length === 0) localErrors.push("Choose at least one size.");
     if (!Number.isFinite(Number(price)) || Number(price) <= 0) localErrors.push("Enter a valid price.");
@@ -75,7 +83,7 @@ export function ProductForm() {
     const input: ProductInput = {
       name: name.trim(), description: description.trim(), priceKobo: Math.round(Number(price) * 100), condition, categoryId,
       sizes, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean), stockQuantity: Number(stock), featured, published,
-      audiences: ["women"], isUnisex: false,
+      audiences, isUnisex,
       reference: reference.trim() || undefined,
     };
     const parsed = productInputSchema.safeParse(input);
@@ -125,7 +133,7 @@ export function ProductForm() {
   return (
     <main className="admin-content">
       <header className="admin-page-head admin-page-head--form"><div><Link className="back-link" to="/owner/products">← Products</Link><p className="eyebrow">{id ? "Update the edit" : "Add to the edit"}</p><h1>{id ? "Edit product" : "New product"}</h1><p>Clear details and strong photos help customers order with confidence.</p></div></header>
-      <form className="product-form" onSubmit={submit}>
+      <form className="product-form" onSubmit={submit} noValidate>
         {errors.length ? <div className="form-error-list" role="alert"><strong>Please check the following:</strong><ul>{errors.map((error) => <li key={error}>{error}</li>)}</ul></div> : null}
         <section className="form-card"><div className="form-card__heading"><span>01</span><div><h2>Product details</h2><p>The essentials customers see while browsing.</p></div></div><div className="form-fields">
           <label className="field field--wide">Product name<input value={name} onChange={(event) => setName(event.target.value)} required minLength={2} /></label>
@@ -133,6 +141,8 @@ export function ProductForm() {
           <label className="field">Price in Naira (₦)<input inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} placeholder="18500" required /></label>
           <label className="field">Category<select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} required><option value="">Choose category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <fieldset className="field field--wide condition-field"><legend>Condition</legend><label><input type="radio" name="condition" value="new" checked={condition === "new"} onChange={() => setCondition("new")} /><span>New<small>Brand-new product</small></span></label><label><input type="radio" name="condition" value="thrifted" checked={condition === "thrifted"} onChange={() => { setCondition("thrifted"); setStock("1"); }} /><span>Thrifted<small>One-of-one pre-loved find</small></span></label></fieldset>
+          <fieldset className="field field--wide admin-size-field"><legend>Who can shop this product?</legend><div>{(["women", "men", "kids"] as Audience[]).map((audience) => <label key={audience}><input type="checkbox" aria-label={audience === "kids" ? "Kids" : `${audience[0].toUpperCase()}${audience.slice(1)}`} checked={audiences.includes(audience)} onChange={() => toggleAudience(audience)} /><span>{audience === "kids" ? "Kids" : `${audience[0].toUpperCase()}${audience.slice(1)}`}</span></label>)}</div></fieldset>
+          <label className="field field--wide"><input type="checkbox" checked={isUnisex} onChange={(event) => setIsUnisex(event.target.checked)} /> Show a Unisex label on this product</label>
           <fieldset className="field field--wide admin-size-field"><legend>Available sizes</legend><div>{commonSizes.map(([value, label]) => <label key={value}><input type="checkbox" aria-label={label} checked={sizes.includes(value)} onChange={() => toggleSize(value)} /><span>{value}<small>{label}</small></span></label>)}</div></fieldset>
           <label className="field">Stock quantity<input type="number" min="0" max={condition === "thrifted" ? 1 : 999} value={stock} onChange={(event) => setStock(event.target.value)} required /></label>
           <label className="field">Reference <span>(optional)</span><input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Generated automatically" /></label>

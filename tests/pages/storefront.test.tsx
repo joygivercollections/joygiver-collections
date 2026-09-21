@@ -99,6 +99,45 @@ describe("Joygiver storefront", () => {
     );
   });
 
+  it("keeps condition first and switches audience with shareable links", async () => {
+    renderAt("/new/men");
+
+    expect(await screen.findByRole("heading", { name: /new for men/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Women" })).toHaveAttribute("href", "/new/women");
+    expect(screen.getByRole("link", { name: "Men" })).toHaveAttribute("href", "/new/men");
+    expect(screen.getByRole("link", { name: "Kids" })).toHaveAttribute("href", "/new/kids");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/categories?audience=men"),
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/condition=new.*audience=men|audience=men.*condition=new/),
+      expect.anything(),
+    );
+  });
+
+  it("labels an assigned Unisex product without creating a Unisex collection", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/categories")) return okJson([]);
+      if (url.includes("/products")) {
+        return okJson({
+          items: [{ ...products[0], audiences: ["women", "men"], isUnisex: true }],
+          page: 1,
+          pageSize: 24,
+          total: 1,
+        });
+      }
+      if (url.includes("/api/config")) return okJson({ whatsAppNumber: "2348030000000" });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    renderAt("/new/women");
+
+    expect(await screen.findByText("Unisex")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /^unisex$/i })).not.toBeInTheDocument();
+  });
+
   it("renders a retry action when the catalogue request fails", async () => {
     fetchMock.mockImplementation(async (input) => {
       if (String(input).includes("/products")) throw new Error("offline");
