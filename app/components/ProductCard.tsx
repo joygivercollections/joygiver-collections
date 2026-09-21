@@ -30,6 +30,7 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.condition === "new" ? "New" : "Thrifted"}
           </span>
           {product.isUnisex ? <span className="condition-badge condition-badge--unisex">Unisex</span> : null}
+          {product.promoEligible ? <span className="condition-badge condition-badge--promo">Promo</span> : null}
           {sold ? <span className="sold-stamp">Sold</span> : null}
         </div>
       </Link>

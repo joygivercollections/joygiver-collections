@@ -4,6 +4,7 @@ import { audienceSchema, cartValidationSchema } from "../../shared/validation";
 import { listActiveCategories } from "../db/categories";
 import { getPublicProduct, listPublicProducts, validateCart } from "../db/products";
 import { getPublicWholesalePackage, listPublicWholesale } from "../db/wholesale";
+import { getPublicPromotion } from "../db/promotions";
 
 interface PublicBindings {
   DB: D1Database;
@@ -67,6 +68,8 @@ publicRoutes.get("/config", (context) =>
     whatsAppNumber: (context.env.WHATSAPP_NUMBER ?? "").replace(/\D/g, ""),
   }),
 );
+
+publicRoutes.get("/promotion", async (context) => context.json(await getPublicPromotion(context.env.DB, new Date())));
 
 publicRoutes.get("/categories", async (context) => {
   const rawAudience = context.req.query("audience");

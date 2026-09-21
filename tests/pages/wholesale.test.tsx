@@ -13,7 +13,7 @@ const packageItem = {
   stockQuantity: 3, state: "available", soldAt: null, featured: true,
   primaryImage: { url: "/media/wholesale/package.jpg", alt: "Denim wholesale package" },
   images: [{ id: "image-1", url: "/media/wholesale/package.jpg", alt: "Denim wholesale package", displayOrder: 0 }],
-  publishedAt: "2026-09-21T10:00:00.000Z",
+  publishedAt: "2026-09-21T10:00:00.000Z", promoEligible: true,
 };
 
 beforeEach(() => {
@@ -35,6 +35,7 @@ it("shows package metadata without individual garment controls", async () => {
   expect(card).toHaveTextContent("Jeans");
   expect(card).toHaveTextContent("24 pieces");
   expect(card).toHaveTextContent("₦180,000");
+  expect(card).toHaveTextContent("Promo");
   expect(card).not.toHaveTextContent(/size/i);
   expect(screen.getByRole("combobox", { name: /audience/i })).toBeVisible();
   expect(screen.getByRole("spinbutton", { name: /minimum pieces/i })).toBeVisible();

@@ -14,8 +14,10 @@ import type {
   WholesalePackage,
   WholesalePackageSummary,
   AdminWholesalePackage,
+  PromotionSummary,
+  AdminPromotion,
 } from "../shared/contracts";
-import type { ProductInput, WholesalePackageInput } from "../shared/validation";
+import type { ProductInput, PromotionInput, WholesalePackageInput } from "../shared/validation";
 
 export class ApiRequestError extends Error implements ApiError {
   readonly status: number;
@@ -117,6 +119,10 @@ export function getStoreConfig(signal?: AbortSignal) {
   return requestJson<{ whatsAppNumber: string }>("/api/config", signal);
 }
 
+export function getActivePromotion(signal?: AbortSignal) {
+  return requestJson<PromotionSummary | null>("/api/promotion", signal);
+}
+
 export function validateCart(lines: import("../shared/contracts").CartLine[], signal?: AbortSignal) {
   return requestJson<import("../shared/contracts").ValidatedCart>("/api/cart/validate", signal, {
     method: "POST",
@@ -182,6 +188,11 @@ export const ownerApi = {
   },
   deleteWholesaleImage: (packageId: string, imageId: string) => requestJson<void>(`/api/admin/wholesale/${encodeURIComponent(packageId)}/images/${encodeURIComponent(imageId)}`, undefined, { method: "DELETE" }),
   reorderWholesaleImages: (packageId: string, imageIds: string[]) => requestJson<{ images: ProductImage[] }>(`/api/admin/wholesale/${encodeURIComponent(packageId)}/images/order`, undefined, jsonRequest("PUT", { imageIds })),
+  promotions: (signal?: AbortSignal) => requestJson<AdminPromotion[]>("/api/admin/promotions", signal),
+  promotion: (id: string, signal?: AbortSignal) => requestJson<AdminPromotion>(`/api/admin/promotions/${encodeURIComponent(id)}`, signal),
+  createPromotion: (input: PromotionInput) => requestJson<AdminPromotion>("/api/admin/promotions", undefined, jsonRequest("POST", input)),
+  updatePromotion: (id: string, input: PromotionInput) => requestJson<AdminPromotion>(`/api/admin/promotions/${encodeURIComponent(id)}`, undefined, jsonRequest("PUT", input)),
+  deletePromotion: (id: string) => requestJson<void>(`/api/admin/promotions/${encodeURIComponent(id)}`, undefined, { method: "DELETE" }),
   uploadImage: async (productId: string, file: File): Promise<ProductImage> => {
     const body = new FormData();
     body.append("images", file);

@@ -48,6 +48,7 @@ export function ProductPage() {
           <div className="product-info__badges">
             <span className={`condition-badge condition-badge--${product.condition}`}>{product.condition === "new" ? "New" : "Thrifted"}</span>
             {product.isUnisex ? <span className="condition-badge condition-badge--unisex">Unisex</span> : null}
+            {product.promoEligible ? <span className="condition-badge condition-badge--promo">Promo</span> : null}
             {sold ? <span className="condition-badge condition-badge--sold">Sold</span> : null}
           </div>
           <p className="eyebrow">{product.category.name} · {product.reference}</p>

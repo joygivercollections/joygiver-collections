@@ -8,6 +8,7 @@ export function WholesalePage() {
   const [target, setTarget] = useState<AdminWholesalePackage | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [notice, setNotice] = useState("");
+  const [promoFilter, setPromoFilter] = useState<"" | "eligible" | "ineligible">("");
   const confirmationRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { ownerApi.wholesale().then((result) => setItems(result.items)).catch(() => setNotice("Wholesale inventory could not be loaded.")); }, []);
@@ -29,7 +30,8 @@ export function WholesalePage() {
     <main className="admin-content">
       <header className="admin-page-head"><div><p className="eyebrow">Wholesale</p><h1>Package Inventory</h1><p>Manage package photos, piece counts, prices, and availability.</p></div><Link className="button button--dark" to="/owner/wholesale/new">Add package</Link></header>
       {notice ? <p className="admin-notice" role="status">{notice}</p> : null}
-      <section className="inventory-list" aria-label="Wholesale packages">{items.map((item) => <article className="inventory-row" key={item.id}>
+      <label>Promotion eligibility <select aria-label="Filter by promotion eligibility" value={promoFilter} onChange={(event) => setPromoFilter(event.target.value as typeof promoFilter)}><option value="">All packages</option><option value="eligible">Promo eligible</option><option value="ineligible">Not promo eligible</option></select></label>
+      <section className="inventory-list" aria-label="Wholesale packages">{items.filter((item) => !promoFilter || (promoFilter === "eligible" ? item.promoEligible : !item.promoEligible)).map((item) => <article className="inventory-row" key={item.id}>
         <div className="inventory-row__image">{item.primaryImage ? <img src={item.primaryImage.url} alt="" /> : <span>J</span>}</div>
         <div className="inventory-row__main"><div className="inventory-row__badges"><span>{item.conditionScope}</span><span className={`status status--${item.state}`}>{item.state}</span></div><h2>{item.name}</h2><p>{item.reference} · {item.pieceCount} pieces · {item.audiences.join(", ")}</p></div>
         <div className="inventory-row__stock"><strong>{formatNaira(item.priceKobo)}</strong><span>{item.stockQuantity} packages</span></div>

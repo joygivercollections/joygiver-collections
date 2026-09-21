@@ -122,7 +122,7 @@ describe("Joygiver storefront", () => {
       if (url.includes("/categories")) return okJson([]);
       if (url.includes("/products")) {
         return okJson({
-          items: [{ ...products[0], audiences: ["women", "men"], isUnisex: true }],
+          items: [{ ...products[0], audiences: ["women", "men"], isUnisex: true, promoEligible: true }],
           page: 1,
           pageSize: 24,
           total: 1,
@@ -135,6 +135,7 @@ describe("Joygiver storefront", () => {
     renderAt("/new/women");
 
     expect(await screen.findByText("Unisex")).toBeVisible();
+    expect(screen.getByText("Promo")).toBeVisible();
     expect(screen.queryByRole("link", { name: /^unisex$/i })).not.toBeInTheDocument();
   });
 

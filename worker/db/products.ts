@@ -18,6 +18,7 @@ import {
   reorderRegisteredImages,
   storeRegisteredImage,
 } from "../lib/images";
+import { getActivePromotion } from "./promotions";
 
 const SOLD_VISIBILITY_MS = 48 * 60 * 60 * 1_000;
 
@@ -65,7 +66,7 @@ function parseStringArray(value: string): string[] {
   return parsed;
 }
 
-function mapSummary(row: ProductRow): ProductSummary {
+function mapSummary(row: ProductRow, promoEligible = false): ProductSummary {
   if (!row.published_at) {
     throw new Error("Published product is missing its publication time");
   }
@@ -83,6 +84,7 @@ function mapSummary(row: ProductRow): ProductSummary {
     },
     audiences: parseStringArray(row.audiences_json) as Audience[],
     isUnisex: row.is_unisex === 1,
+    ...(promoEligible ? { promoEligible: true } : {}),
     sizes: parseStringArray(row.sizes_json),
     tags: parseStringArray(row.tags_json),
     stockQuantity: row.stock_quantity,
@@ -239,8 +241,10 @@ export async function listPublicProducts(
   const countResult = results[0] as D1Result<CountRow>;
   const rowsResult = results[1] as D1Result<ProductRow>;
 
+  const promotion = await getActivePromotion(db, now);
+  const eligible = new Set(promotion?.productIds ?? []);
   return {
-    items: rowsResult.results.map(mapSummary),
+    items: rowsResult.results.map((row) => mapSummary(row, eligible.has(row.id))),
     page,
     pageSize,
     total: Number(countResult.results[0]?.total ?? 0),
@@ -281,8 +285,9 @@ export async function getPublicProduct(
     displayOrder: image.display_order,
   }));
 
+  const promotion = await getActivePromotion(db, now);
   return {
-    ...mapSummary(row),
+    ...mapSummary(row, promotion?.productIds.includes(row.id) ?? false),
     description: row.description,
     featured: row.featured === 1,
     images: mappedImages,
@@ -313,9 +318,10 @@ async function listProductImages(
 async function mapAdminProduct(
   db: D1Database,
   row: ProductRow,
+  promoEligible = false,
 ): Promise<AdminProduct> {
   const summary = row.published_at
-    ? mapSummary(row)
+    ? mapSummary(row, promoEligible)
     : {
         id: row.id,
         reference: row.reference,
@@ -330,6 +336,7 @@ async function mapAdminProduct(
         },
         audiences: parseStringArray(row.audiences_json) as Audience[],
         isUnisex: row.is_unisex === 1,
+        ...(promoEligible ? { promoEligible: true } : {}),
         sizes: parseStringArray(row.sizes_json),
         tags: parseStringArray(row.tags_json),
         stockQuantity: row.stock_quantity,
@@ -420,7 +427,9 @@ export async function getAdminProduct(
   id: string,
 ): Promise<AdminProduct | null> {
   const row = await productRowById(db, id);
-  return row ? mapAdminProduct(db, row) : null;
+  if (!row) return null;
+  const promotion = await getActivePromotion(db, new Date());
+  return mapAdminProduct(db, row, promotion?.productIds.includes(row.id) ?? false);
 }
 
 export class ClothingTypeAudienceError extends Error {
@@ -666,8 +675,10 @@ export async function listAdminProducts(
       .bind(...values, pageSize, (page - 1) * pageSize),
   ]);
   const rows = (rowsResult as D1Result<ProductRow>).results;
+  const promotion = await getActivePromotion(db, new Date());
+  const eligible = new Set(promotion?.productIds ?? []);
   return {
-    items: await Promise.all(rows.map((row) => mapAdminProduct(db, row))),
+    items: await Promise.all(rows.map((row) => mapAdminProduct(db, row, eligible.has(row.id)))),
     page,
     pageSize,
     total: Number((countResult as D1Result<CountRow>).results[0]?.total ?? 0),

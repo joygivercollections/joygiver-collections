@@ -16,6 +16,7 @@ import {
   reorderRegisteredImages,
   storeRegisteredImage,
 } from "../lib/images";
+import { getActivePromotion } from "./promotions";
 
 const SOLD_VISIBILITY_MS = 48 * 60 * 60 * 1_000;
 
@@ -67,7 +68,7 @@ const SELECT_WHOLESALE = `
   FROM wholesale_packages w
 `;
 
-function mapSummary(row: WholesaleRow): WholesalePackageSummary {
+function mapSummary(row: WholesaleRow, promoEligible = false): WholesalePackageSummary {
   if (!row.published_at) throw new Error("Published wholesale package is missing its publication time");
   return {
     id: row.id,
@@ -84,13 +85,14 @@ function mapSummary(row: WholesaleRow): WholesalePackageSummary {
     state: row.state,
     soldAt: row.sold_at,
     featured: row.featured === 1,
+    ...(promoEligible ? { promoEligible: true } : {}),
     primaryImage: row.primary_image_key ? { url: imageUrl(row.primary_image_key), alt: row.primary_image_alt ?? row.name } : null,
     publishedAt: row.published_at,
   };
 }
 
-async function mapAdmin(db: D1Database, row: WholesaleRow): Promise<AdminWholesalePackage> {
-  const summary = row.published_at ? mapSummary(row) : {
+async function mapAdmin(db: D1Database, row: WholesaleRow, promoEligible = false): Promise<AdminWholesalePackage> {
+  const summary = row.published_at ? mapSummary(row, promoEligible) : {
     id: row.id,
     reference: row.reference,
     slug: row.slug,
@@ -105,6 +107,7 @@ async function mapAdmin(db: D1Database, row: WholesaleRow): Promise<AdminWholesa
     state: row.state,
     soldAt: row.sold_at,
     featured: row.featured === 1,
+    ...(promoEligible ? { promoEligible: true } : {}),
     primaryImage: row.primary_image_key ? { url: imageUrl(row.primary_image_key), alt: row.primary_image_alt ?? row.name } : null,
     publishedAt: "",
   };
@@ -156,8 +159,10 @@ export async function listPublicWholesale(db: D1Database, filters: WholesaleFilt
     db.prepare(`SELECT COUNT(*) AS total FROM wholesale_packages w WHERE ${where.sql}`).bind(...where.values),
     db.prepare(`${SELECT_WHOLESALE} WHERE ${where.sql} ORDER BY ${orderBy(filters.sort)} LIMIT ? OFFSET ?`).bind(...where.values, pageSize, (page - 1) * pageSize),
   ]);
+  const promotion = await getActivePromotion(db, now);
+  const eligible = new Set(promotion?.wholesalePackageIds ?? []);
   return {
-    items: (rowsResult as D1Result<WholesaleRow>).results.map(mapSummary),
+    items: (rowsResult as D1Result<WholesaleRow>).results.map((row) => mapSummary(row, eligible.has(row.id))),
     page,
     pageSize,
     total: Number((countResult as D1Result<CountRow>).results[0]?.total ?? 0),
@@ -168,7 +173,8 @@ export async function getPublicWholesalePackage(db: D1Database, slug: string, no
   const where = publicWhere({}, now);
   const row = await db.prepare(`${SELECT_WHOLESALE} WHERE ${where.sql} AND w.slug = ? LIMIT 1`).bind(...where.values, slug).first<WholesaleRow>();
   if (!row) return null;
-  return { ...mapSummary(row), images: await listRegisteredImages(db, { ownerType: "wholesale", ownerId: row.id }) };
+  const promotion = await getActivePromotion(db, now);
+  return { ...mapSummary(row, promotion?.wholesalePackageIds.includes(row.id) ?? false), images: await listRegisteredImages(db, { ownerType: "wholesale", ownerId: row.id }) };
 }
 
 async function rowById(db: D1Database, id: string) {
@@ -177,7 +183,9 @@ async function rowById(db: D1Database, id: string) {
 
 export async function getAdminWholesalePackage(db: D1Database, id: string): Promise<AdminWholesalePackage | null> {
   const row = await rowById(db, id);
-  return row ? mapAdmin(db, row) : null;
+  if (!row) return null;
+  const promotion = await getActivePromotion(db, new Date());
+  return mapAdmin(db, row, promotion?.wholesalePackageIds.includes(row.id) ?? false);
 }
 
 function slugify(value: string) {
@@ -281,13 +289,17 @@ export async function listAdminWholesalePackages(db: D1Database, filters: Wholes
     db.prepare(`SELECT COUNT(*) AS total FROM wholesale_packages w ${where}`).bind(...values),
     db.prepare(`${SELECT_WHOLESALE} ${where} ORDER BY w.updated_at DESC, w.id DESC LIMIT ? OFFSET ?`).bind(...values, pageSize, (page - 1) * pageSize),
   ]);
-  return { items: await Promise.all((rowsResult as D1Result<WholesaleRow>).results.map((row) => mapAdmin(db, row))), page, pageSize, total: Number((countResult as D1Result<CountRow>).results[0]?.total ?? 0) };
+  const promotion = await getActivePromotion(db, new Date());
+  const eligible = new Set(promotion?.wholesalePackageIds ?? []);
+  return { items: await Promise.all((rowsResult as D1Result<WholesaleRow>).results.map((row) => mapAdmin(db, row, eligible.has(row.id)))), page, pageSize, total: Number((countResult as D1Result<CountRow>).results[0]?.total ?? 0) };
 }
 
 export async function getWholesaleForCart(db: D1Database, ids: string[]): Promise<AdminWholesalePackage[]> {
   if (!ids.length) return [];
   const rows = await db.prepare(`${SELECT_WHOLESALE} WHERE w.id IN (${ids.map(() => "?").join(", ")})`).bind(...ids).all<WholesaleRow>();
-  return Promise.all(rows.results.map((row) => mapAdmin(db, row)));
+  const promotion = await getActivePromotion(db, new Date());
+  const eligible = new Set(promotion?.wholesalePackageIds ?? []);
+  return Promise.all(rows.results.map((row) => mapAdmin(db, row, eligible.has(row.id))));
 }
 
 export function storeWholesaleImage(db: D1Database, bucket: R2Bucket, packageId: string, file: File, altText?: string): Promise<ProductImage> {

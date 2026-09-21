@@ -11,6 +11,7 @@ export function ProductsPage() {
   const [condition, setCondition] = useState("");
   const [state, setState] = useState("");
   const [audience, setAudience] = useState<Audience | "">("");
+  const [promoFilter, setPromoFilter] = useState<"" | "eligible" | "ineligible">("");
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<AdminProduct | null>(null);
   const [confirmation, setConfirmation] = useState("");
@@ -75,10 +76,11 @@ export function ProductsPage() {
         <select aria-label="Filter by condition" value={condition} onChange={(event) => setCondition(event.target.value)}><option value="">All conditions</option><option value="new">New</option><option value="thrifted">Thrifted</option></select>
         <select aria-label="Filter by audience" value={audience} onChange={(event) => setAudience(event.target.value as Audience | "")}><option value="">All audiences</option><option value="women">Women</option><option value="men">Men</option><option value="kids">Kids</option></select>
         <select aria-label="Filter by status" value={state} onChange={(event) => setState(event.target.value)}><option value="">All statuses</option><option value="available">Available</option><option value="sold">Sold</option><option value="hidden">Hidden</option></select>
+        <select aria-label="Filter by promotion eligibility" value={promoFilter} onChange={(event) => setPromoFilter(event.target.value as typeof promoFilter)}><option value="">All promotion states</option><option value="eligible">Promo eligible</option><option value="ineligible">Not promo eligible</option></select>
       </section>
       <div className="inventory-count"><p>{loading ? "Loading inventory…" : `${total} ${total === 1 ? "product" : "products"}`}</p></div>
       <section className="inventory-list" aria-label="Products">
-        {products.map((product) => (
+        {products.filter((product) => !promoFilter || (promoFilter === "eligible" ? product.promoEligible : !product.promoEligible)).map((product) => (
           <article className="inventory-row" key={product.id}>
             <div className="inventory-row__image">{product.primaryImage ? <img src={product.primaryImage.url} alt="" /> : <span>J</span>}</div>
             <div className="inventory-row__main"><div className="inventory-row__badges"><span>{product.condition}</span>{product.isUnisex ? <span>Unisex</span> : null}<span className={`status status--${product.state}`}>{product.state}</span>{!product.published ? <span>draft</span> : null}</div><h2>{product.name}</h2><p>{product.reference} · {product.category.name} · {product.audiences.join(", ")}</p></div>

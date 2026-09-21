@@ -30,7 +30,7 @@ export function WholesaleDetailPage() {
       <div className="product-detail__grid">
         <div className="product-gallery">{item.images.length ? item.images.map((image) => <img key={image.id} src={image.url} alt={image.alt} />) : <div className="product-gallery__placeholder"><span>J</span></div>}</div>
         <section className="product-info">
-          <div className="product-info__badges"><span className="condition-badge">{item.conditionScope}</span>{sold ? <span className="condition-badge condition-badge--sold">Sold</span> : null}</div>
+          <div className="product-info__badges"><span className="condition-badge">{item.conditionScope}</span>{item.promoEligible ? <span className="condition-badge condition-badge--promo">Promo</span> : null}{sold ? <span className="condition-badge condition-badge--sold">Sold</span> : null}</div>
           <p className="eyebrow">{audience} · {item.reference}</p><h1>{item.name}</h1><p className="product-info__price">{formatNaira(item.priceKobo)}</p>
           <p>{item.pieceCount} pieces · {item.categories.map((category) => category.name).join(", ")}</p><p className="product-info__description">{item.description}</p>
           <label>Package quantity<input aria-label="Package quantity" type="number" min="1" max={Math.max(1, item.stockQuantity)} value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={sold} /></label>

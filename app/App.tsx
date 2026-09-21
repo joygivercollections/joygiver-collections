@@ -17,6 +17,8 @@ import { WholesalePage } from "./pages/WholesalePage";
 import { WholesaleDetailPage } from "./pages/WholesaleDetailPage";
 import { WholesalePage as AdminWholesalePage } from "./admin/WholesalePage";
 import { WholesaleForm } from "./admin/WholesaleForm";
+import { PromotionsPage } from "./admin/PromotionsPage";
+import { PromotionForm } from "./admin/PromotionForm";
 
 export function App() {
   return (
@@ -30,6 +32,9 @@ export function App() {
         <Route path="wholesale" element={<AdminWholesalePage />} />
         <Route path="wholesale/new" element={<WholesaleForm />} />
         <Route path="wholesale/:id" element={<WholesaleForm />} />
+        <Route path="promotions" element={<PromotionsPage />} />
+        <Route path="promotions/new" element={<PromotionForm />} />
+        <Route path="promotions/:id" element={<PromotionForm />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>

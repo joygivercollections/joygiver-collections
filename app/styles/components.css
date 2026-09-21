@@ -419,6 +419,12 @@
 .wholesale-detail { padding-block: 34px 100px; }
 .wholesale-detail .product-info > label { display: grid; gap: 8px; margin: 22px 0; font-size: .68rem; font-weight: 700; text-transform: uppercase; }
 .wholesale-detail .product-info > label input { width: 110px; height: 46px; border: 1px solid var(--border); padding: 0 12px; }
+.promotion-eligibility { display: grid; gap: 24px; }
+.promotion-eligibility > div { display: grid; align-content: start; gap: 9px; }
+.promotion-eligibility label { display: flex; gap: 9px; align-items: center; font-size: .75rem; }
+.promotion-eligibility label:first-child { display: grid; font-size: .62rem; font-weight: 700; text-transform: uppercase; }
+.promotion-eligibility input[type="text"], .promotion-eligibility label:first-child input { height: 44px; border: 1px solid var(--border); padding: 0 10px; }
+.condition-badge--promo { background: var(--champagne); color: var(--charcoal); }
 
 .site-footer { padding-top: 65px; background: var(--charcoal); color: #e9e4da; }
 .site-footer__grid { display: grid; gap: 36px; }
@@ -505,6 +511,7 @@
   .wholesale-filters > label:first-child { grid-column: span 2; }
   .wholesale-filters .button { grid-column: auto; align-self: end; }
   .wholesale-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .promotion-eligibility { grid-template-columns: 1fr 1fr; }
 }
 
 @media (min-width: 1000px) {

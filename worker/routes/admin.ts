@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { audienceSchema, productInputSchema, wholesalePackageInputSchema } from "../../shared/validation";
+import { audienceSchema, productInputSchema, promotionInputSchema, wholesalePackageInputSchema } from "../../shared/validation";
 import {
   CategoryAudienceConflictError,
   createCategory,
@@ -35,6 +35,14 @@ import {
   WholesaleTypeAudienceError,
 } from "../db/wholesale";
 import { ImageStorageError, validateImageFile } from "../lib/images";
+import {
+  createAdminPromotion,
+  deleteAdminPromotion,
+  getAdminPromotion,
+  listAdminPromotions,
+  PromotionScheduleOverlapError,
+  updateAdminPromotion,
+} from "../db/promotions";
 import { requireSameOrigin } from "../lib/origin";
 import { getAdminFromRequest } from "../lib/session";
 
@@ -444,6 +452,42 @@ adminRoutes.put("/wholesale/:id/images/order", async (context) => {
   if (!parsed.success) return context.json({ status: 400, code: "invalid_image_order", message: "Image order is invalid" }, 400);
   const images = await reorderWholesaleImages(context.env.DB, context.req.param("id"), parsed.data.imageIds);
   return images ? context.json({ images }) : context.json({ status: 409, code: "image_order_conflict", message: "Image list changed; refresh and try again" }, 409);
+});
+
+adminRoutes.get("/promotions", async (context) => context.json(await listAdminPromotions(context.env.DB)));
+
+adminRoutes.post("/promotions", async (context) => {
+  const parsed = promotionInputSchema.safeParse(await readJson(context.req.raw));
+  if (!parsed.success) return context.json({ status: 400, code: "invalid_promotion", message: "Promotion details are invalid", fieldErrors: parsed.error.flatten().fieldErrors }, 400);
+  try { return context.json(await createAdminPromotion(context.env.DB, parsed.data), 201); }
+  catch (error) {
+    if (error instanceof PromotionScheduleOverlapError) return context.json({ status: 409, code: "promotion_schedule_overlap", message: error.message }, 409);
+    if (databaseConflict(error)) return context.json({ status: 409, code: "promotion_conflict", message: "Promotion eligibility contains an unavailable item" }, 409);
+    throw error;
+  }
+});
+
+adminRoutes.get("/promotions/:id", async (context) => {
+  const promotion = await getAdminPromotion(context.env.DB, context.req.param("id"));
+  return promotion ? context.json(promotion) : context.json({ status: 404, code: "promotion_not_found", message: "Promotion was not found" }, 404);
+});
+
+adminRoutes.put("/promotions/:id", async (context) => {
+  const parsed = promotionInputSchema.safeParse(await readJson(context.req.raw));
+  if (!parsed.success) return context.json({ status: 400, code: "invalid_promotion", message: "Promotion details are invalid", fieldErrors: parsed.error.flatten().fieldErrors }, 400);
+  try {
+    const promotion = await updateAdminPromotion(context.env.DB, context.req.param("id"), parsed.data);
+    return promotion ? context.json(promotion) : context.json({ status: 404, code: "promotion_not_found", message: "Promotion was not found" }, 404);
+  } catch (error) {
+    if (error instanceof PromotionScheduleOverlapError) return context.json({ status: 409, code: "promotion_schedule_overlap", message: error.message }, 409);
+    if (databaseConflict(error)) return context.json({ status: 409, code: "promotion_conflict", message: "Promotion eligibility contains an unavailable item" }, 409);
+    throw error;
+  }
+});
+
+adminRoutes.delete("/promotions/:id", async (context) => {
+  const deleted = await deleteAdminPromotion(context.env.DB, context.req.param("id"));
+  return deleted ? context.body(null, 204) : context.json({ status: 404, code: "promotion_not_found", message: "Promotion was not found" }, 404);
 });
 
 adminRoutes.get("/categories", async (context) =>

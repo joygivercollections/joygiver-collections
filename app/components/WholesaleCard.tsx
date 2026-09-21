@@ -11,7 +11,7 @@ export function WholesaleCard({ item }: { item: WholesalePackageSummary }) {
   return (
     <article className="wholesale-card">
       <Link to={`/wholesale/${item.slug}`} aria-label={`View ${item.name}`}>
-        <div className="wholesale-card__image">{item.primaryImage ? <img src={item.primaryImage.url} alt={item.primaryImage.alt} loading="lazy" /> : <span aria-hidden="true">J</span>}{sold ? <span className="sold-stamp">Sold</span> : null}</div>
+        <div className="wholesale-card__image">{item.primaryImage ? <img src={item.primaryImage.url} alt={item.primaryImage.alt} loading="lazy" /> : <span aria-hidden="true">J</span>}{sold ? <span className="sold-stamp">Sold</span> : null}{item.promoEligible ? <span className="condition-badge condition-badge--promo">Promo</span> : null}</div>
       </Link>
       <div className="wholesale-card__body">
         <p className="eyebrow">{audienceLabel(item.audiences)} · {item.conditionScope[0].toUpperCase()}{item.conditionScope.slice(1)}</p>
