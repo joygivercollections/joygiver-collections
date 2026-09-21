@@ -58,6 +58,20 @@ export async function getPublicPromotion(db: D1Database, now = new Date()): Prom
   return publicSummary;
 }
 
+export async function getCurrentOrNextPromotion(
+  db: D1Database,
+  now = new Date(),
+): Promise<(PromotionSummary & { status: "active" | "scheduled" }) | null> {
+  const timestamp = now.toISOString();
+  const row = await db.prepare(
+    `SELECT * FROM promotions
+     WHERE paused = 0 AND end_at > ?
+     ORDER BY CASE WHEN start_at <= ? THEN 0 ELSE 1 END, start_at ASC
+     LIMIT 1`,
+  ).bind(timestamp, timestamp).first<PromotionRow>();
+  return row ? { ...summary(row), status: row.start_at <= timestamp ? "active" : "scheduled" } : null;
+}
+
 export async function listAdminPromotions(db: D1Database): Promise<AdminPromotion[]> {
   const rows = await db.prepare("SELECT * FROM promotions ORDER BY start_at DESC, created_at DESC").all<PromotionRow>();
   return Promise.all(rows.results.map((row) => mapAdmin(db, row)));

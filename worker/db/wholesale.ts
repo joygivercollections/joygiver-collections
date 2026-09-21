@@ -302,6 +302,11 @@ export async function getWholesaleForCart(db: D1Database, ids: string[]): Promis
   return Promise.all(rows.results.map((row) => mapAdmin(db, row, eligible.has(row.id))));
 }
 
+export async function getAvailableWholesaleCount(db: D1Database): Promise<number> {
+  const row = await db.prepare("SELECT COUNT(*) AS total FROM wholesale_packages WHERE state = 'available'").first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
 export function storeWholesaleImage(db: D1Database, bucket: R2Bucket, packageId: string, file: File, altText?: string): Promise<ProductImage> {
   return storeRegisteredImage(db, bucket, { ownerType: "wholesale", ownerId: packageId }, file, altText);
 }

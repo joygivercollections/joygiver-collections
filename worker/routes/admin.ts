@@ -32,6 +32,7 @@ import {
   reorderWholesaleImages,
   storeWholesaleImage,
   updateAdminWholesalePackage,
+  getAvailableWholesaleCount,
   WholesaleTypeAudienceError,
 } from "../db/wholesale";
 import { ImageStorageError, validateImageFile } from "../lib/images";
@@ -40,6 +41,7 @@ import {
   deleteAdminPromotion,
   getAdminPromotion,
   listAdminPromotions,
+  getCurrentOrNextPromotion,
   PromotionScheduleOverlapError,
   updateAdminPromotion,
 } from "../db/promotions";
@@ -121,9 +123,14 @@ adminRoutes.use("*", async (context, next) => {
   await next();
 });
 
-adminRoutes.get("/summary", async (context) =>
-  context.json(await getInventorySummary(context.env.DB)),
-);
+adminRoutes.get("/summary", async (context) => {
+  const [retail, availableWholesalePackages, promotion] = await Promise.all([
+    getInventorySummary(context.env.DB),
+    getAvailableWholesaleCount(context.env.DB),
+    getCurrentOrNextPromotion(context.env.DB),
+  ]);
+  return context.json({ ...retail, availableWholesalePackages, promotion });
+});
 
 adminRoutes.get("/products", async (context) => {
   const parsed = adminListSchema.safeParse(context.req.query());

@@ -61,6 +61,9 @@ export interface InventorySummary {
   hidden: number;
   new: number;
   thrifted: number;
+  retailByAudience: Record<Audience, number>;
+  availableWholesalePackages: number;
+  promotion: (PromotionSummary & { status: "active" | "scheduled" }) | null;
 }
 
 export interface CatalogueFilters {

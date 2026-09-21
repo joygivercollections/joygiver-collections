@@ -599,8 +599,8 @@ export async function deleteAdminProduct(
 export async function getInventorySummary(
   db: D1Database,
 ): Promise<InventorySummary> {
-  const row = await db
-    .prepare(
+  const [summaryResult, audienceResult] = await db.batch([
+    db.prepare(
       `SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN state = 'available' THEN 1 ELSE 0 END) AS available,
@@ -609,8 +609,18 @@ export async function getInventorySummary(
         SUM(CASE WHEN condition = 'new' THEN 1 ELSE 0 END) AS new_count,
         SUM(CASE WHEN condition = 'thrifted' THEN 1 ELSE 0 END) AS thrifted_count
        FROM products`,
-    )
-    .first<Record<string, number | null>>();
+    ),
+    db.prepare(
+      `SELECT audience, COUNT(DISTINCT product_id) AS total
+       FROM product_audiences
+       GROUP BY audience`,
+    ),
+  ]);
+  const row = (summaryResult as D1Result<Record<string, number | null>>).results[0];
+  const byAudience = { women: 0, men: 0, kids: 0 };
+  for (const item of (audienceResult as D1Result<{ audience: Audience; total: number }>).results) {
+    byAudience[item.audience] = Number(item.total ?? 0);
+  }
   return {
     total: Number(row?.total ?? 0),
     available: Number(row?.available ?? 0),
@@ -618,6 +628,9 @@ export async function getInventorySummary(
     hidden: Number(row?.hidden ?? 0),
     new: Number(row?.new_count ?? 0),
     thrifted: Number(row?.thrifted_count ?? 0),
+    retailByAudience: byAudience,
+    availableWholesalePackages: 0,
+    promotion: null,
   };
 }
 
