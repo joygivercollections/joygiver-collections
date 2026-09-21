@@ -1,5 +1,6 @@
 import type {
   AdminProduct,
+  Audience,
   CatalogueFilters,
   CartLine,
   InventorySummary,
@@ -32,6 +33,8 @@ interface ProductRow {
   featured: number;
   published: number;
   published_at: string | null;
+  is_unisex: number;
+  audiences_json: string;
   primary_image_key: string | null;
   primary_image_alt: string | null;
 }
@@ -78,6 +81,8 @@ function mapSummary(row: ProductRow): ProductSummary {
       name: row.category_name,
       slug: row.category_slug,
     },
+    audiences: parseStringArray(row.audiences_json) as Audience[],
+    isUnisex: row.is_unisex === 1,
     sizes: parseStringArray(row.sizes_json),
     tags: parseStringArray(row.tags_json),
     stockQuantity: row.stock_quantity,
@@ -122,6 +127,13 @@ function buildWhere(
   if (filters.condition) {
     clauses.push("p.condition = ?");
     values.push(filters.condition);
+  }
+  if (filters.audience) {
+    clauses.push(`EXISTS (
+      SELECT 1 FROM product_audiences pa
+      WHERE pa.product_id = p.id AND pa.audience = ?
+    )`);
+    values.push(filters.audience);
   }
   if (filters.category) {
     clauses.push("c.slug = ?");
@@ -168,6 +180,16 @@ const SELECT_PRODUCT = `
     p.condition, p.category_id, c.name AS category_name,
     c.slug AS category_slug, p.sizes_json, p.tags_json,
     p.stock_quantity, p.state, p.sold_at, p.featured, p.published, p.published_at,
+    p.is_unisex,
+    COALESCE((
+      SELECT json_group_array(audience)
+      FROM (
+        SELECT pa.audience AS audience
+        FROM product_audiences pa
+        WHERE pa.product_id = p.id
+        ORDER BY pa.audience ASC
+      )
+    ), '[]') AS audiences_json,
     (
       SELECT pi.object_key FROM product_images pi
       WHERE pi.product_id = p.id
@@ -306,6 +328,8 @@ async function mapAdminProduct(
           name: row.category_name,
           slug: row.category_slug,
         },
+        audiences: parseStringArray(row.audiences_json) as Audience[],
+        isUnisex: row.is_unisex === 1,
         sizes: parseStringArray(row.sizes_json),
         tags: parseStringArray(row.tags_json),
         stockQuantity: row.stock_quantity,
@@ -399,11 +423,37 @@ export async function getAdminProduct(
   return row ? mapAdminProduct(db, row) : null;
 }
 
+export class ClothingTypeAudienceError extends Error {
+  constructor() {
+    super("The selected clothing type is not available for every selected audience");
+    this.name = "ClothingTypeAudienceError";
+  }
+}
+
+async function ensureCategoryAudiences(
+  db: D1Database,
+  categoryId: string,
+  audiences: Audience[],
+): Promise<void> {
+  const result = await db
+    .prepare(
+      `SELECT audience FROM category_audiences
+       WHERE category_id = ?`,
+    )
+    .bind(categoryId)
+    .all<{ audience: Audience }>();
+  const assigned = new Set(result.results.map((row) => row.audience));
+  if (audiences.some((audience) => !assigned.has(audience))) {
+    throw new ClothingTypeAudienceError();
+  }
+}
+
 export async function createAdminProduct(
   db: D1Database,
   input: ProductInput,
   now = new Date(),
 ): Promise<AdminProduct> {
+  await ensureCategoryAudiences(db, input.categoryId, input.audiences);
   const id = crypto.randomUUID();
   const reference = input.reference?.trim().toUpperCase() || (await uniqueReference(db));
   const slug = await uniqueProductSlug(db, input.name);
@@ -415,8 +465,9 @@ export async function createAdminProduct(
         `INSERT INTO products (
           id, reference, slug, name, description, price_kobo, condition,
           category_id, sizes_json, tags_json, stock_quantity, state,
-          featured, published, published_at, sold_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?, ?, ?, NULL, ?, ?)`,
+          featured, published, published_at, sold_at, created_at, updated_at,
+          is_unisex
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?, ?, ?, NULL, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -435,7 +486,15 @@ export async function createAdminProduct(
         publishedAt,
         timestamp,
         timestamp,
+        input.isUnisex ? 1 : 0,
       ),
+    ...input.audiences.map((audience) =>
+      db
+        .prepare(
+          "INSERT INTO product_audiences (product_id, audience) VALUES (?, ?)",
+        )
+        .bind(id, audience),
+    ),
   ]);
   const created = await getAdminProduct(db, id);
   if (!created) throw new Error("Created product could not be read");
@@ -450,6 +509,7 @@ export async function updateAdminProduct(
 ): Promise<AdminProduct | null> {
   const existing = await productRowById(db, id);
   if (!existing) return null;
+  await ensureCategoryAudiences(db, input.categoryId, input.audiences);
   const reference = input.reference?.trim().toUpperCase() || existing.reference;
   const slug = await uniqueProductSlug(db, input.name, id);
   const publishedAt = input.published
@@ -462,6 +522,7 @@ export async function updateAdminProduct(
           reference = ?, slug = ?, name = ?, description = ?, price_kobo = ?,
           condition = ?, category_id = ?, sizes_json = ?, tags_json = ?,
           stock_quantity = ?, featured = ?, published = ?, published_at = ?,
+          is_unisex = ?,
           updated_at = ?
          WHERE id = ?`,
       )
@@ -479,9 +540,18 @@ export async function updateAdminProduct(
         input.featured ? 1 : 0,
         input.published ? 1 : 0,
         publishedAt,
+        input.isUnisex ? 1 : 0,
         now.toISOString(),
         id,
       ),
+    db.prepare("DELETE FROM product_audiences WHERE product_id = ?").bind(id),
+    ...input.audiences.map((audience) =>
+      db
+        .prepare(
+          "INSERT INTO product_audiences (product_id, audience) VALUES (?, ?)",
+        )
+        .bind(id, audience),
+    ),
   ]);
   return getAdminProduct(db, id);
 }
@@ -545,6 +615,7 @@ export async function listAdminProducts(
     search?: string;
     state?: "available" | "sold" | "hidden";
     condition?: "new" | "thrifted";
+    audience?: Audience;
     category?: string;
     page?: number;
     limit?: number;
@@ -564,6 +635,13 @@ export async function listAdminProducts(
   if (options.condition) {
     clauses.push("p.condition = ?");
     values.push(options.condition);
+  }
+  if (options.audience) {
+    clauses.push(`EXISTS (
+      SELECT 1 FROM product_audiences pa
+      WHERE pa.product_id = p.id AND pa.audience = ?
+    )`);
+    values.push(options.audience);
   }
   if (options.category) {
     clauses.push("c.slug = ?");

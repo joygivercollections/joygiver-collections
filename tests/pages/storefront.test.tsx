@@ -17,6 +17,8 @@ const products: ProductSummary[] = Array.from({ length: 8 }, (_, index) => ({
     name: index % 2 === 0 ? "Gowns" : "Two-piece Sets",
     slug: index % 2 === 0 ? "gowns" : "two-piece-sets",
   },
+  audiences: ["women"],
+  isUnisex: false,
   sizes: ["M", "L"],
   tags: ["elegant"],
   stockQuantity: 1,

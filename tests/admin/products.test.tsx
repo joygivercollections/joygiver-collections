@@ -7,7 +7,7 @@ import { ProductsPage } from "../../app/admin/ProductsPage";
 
 const product: AdminProduct = {
   id: "p1", reference: "JGC-A1B2C3D4", slug: "champagne-skirt", name: "Champagne Maxi Skirt", description: "Elegant flow", priceKobo: 24_000_00,
-  condition: "new", category: { id: "maxi", name: "Maxi Skirts", slug: "maxi-skirts" }, sizes: ["M"], tags: ["elegant"], stockQuantity: 2,
+  condition: "new", category: { id: "maxi", name: "Maxi Skirts", slug: "maxi-skirts" }, audiences: ["women"], isUnisex: false, sizes: ["M"], tags: ["elegant"], stockQuantity: 2,
   state: "available", soldAt: null, primaryImage: null, images: [], featured: false, published: true, publishedAt: new Date().toISOString(),
 };
 

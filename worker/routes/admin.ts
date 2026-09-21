@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { productInputSchema } from "../../shared/validation";
+import { audienceSchema, productInputSchema } from "../../shared/validation";
 import {
+  CategoryAudienceConflictError,
   createCategory,
   listAllCategories,
   retireCategory,
@@ -9,6 +10,7 @@ import {
 } from "../db/categories";
 import {
   changeProductState,
+  ClothingTypeAudienceError,
   createAdminProduct,
   deleteAdminProduct,
   deleteProductImage,
@@ -41,6 +43,7 @@ const adminListSchema = z.object({
   search: z.string().trim().max(120).optional(),
   state: z.enum(["available", "sold", "hidden"]).optional(),
   condition: z.enum(["new", "thrifted"]).optional(),
+  audience: audienceSchema.optional(),
   category: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(24),
@@ -51,6 +54,7 @@ const categorySchema = z.object({
   name: z.string().trim().min(2).max(80),
   displayOrder: z.number().int().min(0).max(10_000).default(0),
   active: z.boolean().default(true),
+  audiences: z.array(audienceSchema).min(1).max(3).default(["women"]),
 });
 const imageOrderSchema = z.object({
   imageIds: z.array(z.string().uuid()).max(6),
@@ -117,6 +121,12 @@ adminRoutes.post("/products", async (context) => {
   try {
     return context.json(await createAdminProduct(context.env.DB, parsed.data), 201);
   } catch (error) {
+    if (error instanceof ClothingTypeAudienceError) {
+      return context.json(
+        { status: 409, code: "clothing_type_audience_conflict", message: error.message },
+        409,
+      );
+    }
     if (databaseConflict(error)) {
       return context.json(
         { status: 409, code: "product_conflict", message: "Reference, category, or product address conflicts" },
@@ -163,6 +173,12 @@ adminRoutes.put("/products/:id", async (context) => {
           404,
         );
   } catch (error) {
+    if (error instanceof ClothingTypeAudienceError) {
+      return context.json(
+        { status: 409, code: "clothing_type_audience_conflict", message: error.message },
+        409,
+      );
+    }
     if (databaseConflict(error)) {
       return context.json(
         { status: 409, code: "product_conflict", message: "Reference, category, or product address conflicts" },
@@ -332,6 +348,7 @@ adminRoutes.post("/categories", async (context) => {
         context.env.DB,
         parsed.data.name,
         parsed.data.displayOrder,
+        parsed.data.audiences,
       ),
       201,
     );
@@ -354,13 +371,34 @@ adminRoutes.put("/categories/:id", async (context) => {
       400,
     );
   }
-  const category = await updateCategory(context.env.DB, context.req.param("id"), parsed.data);
-  return category
-    ? context.json(category)
-    : context.json(
-        { status: 404, code: "category_not_found", message: "Category was not found" },
-        404,
+  try {
+    const category = await updateCategory(context.env.DB, context.req.param("id"), parsed.data);
+    return category
+      ? context.json(category)
+      : context.json(
+          { status: 404, code: "category_not_found", message: "Category was not found" },
+          404,
+        );
+  } catch (error) {
+    if (error instanceof CategoryAudienceConflictError) {
+      return context.json(
+        {
+          status: 409,
+          code: "clothing_type_audience_conflict",
+          message: error.message,
+          productCount: error.productCount,
+        },
+        409,
       );
+    }
+    if (databaseConflict(error)) {
+      return context.json(
+        { status: 409, code: "category_conflict", message: "A clothing type with this name already exists" },
+        409,
+      );
+    }
+    throw error;
+  }
 });
 
 adminRoutes.delete("/categories/:id", async (context) => {

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { cartValidationSchema } from "../../shared/validation";
+import { audienceSchema, cartValidationSchema } from "../../shared/validation";
 import { listActiveCategories } from "../db/categories";
 import { getPublicProduct, listPublicProducts, validateCart } from "../db/products";
 
@@ -17,6 +17,7 @@ const optionalTrimmed = z.preprocess(
 const catalogueQuerySchema = z
   .object({
     condition: z.enum(["new", "thrifted"]).optional(),
+    audience: audienceSchema.optional(),
     category: optionalTrimmed,
     size: optionalTrimmed,
     minPriceKobo: z.coerce.number().int().min(0).optional(),
@@ -49,10 +50,29 @@ publicRoutes.get("/config", (context) =>
 );
 
 publicRoutes.get("/categories", async (context) => {
-  return context.json(await listActiveCategories(context.env.DB));
+  const rawAudience = context.req.query("audience");
+  const audience = rawAudience === undefined
+    ? undefined
+    : audienceSchema.safeParse(rawAudience);
+  if (audience && !audience.success) {
+    return context.json(
+      { status: 400, code: "invalid_audience", message: "Audience must be Women, Men, or Kids" },
+      400,
+    );
+  }
+  return context.json(
+    await listActiveCategories(context.env.DB, audience?.data),
+  );
 });
 
 publicRoutes.get("/products", async (context) => {
+  const rawAudience = context.req.query("audience");
+  if (rawAudience !== undefined && !audienceSchema.safeParse(rawAudience).success) {
+    return context.json(
+      { status: 400, code: "invalid_audience", message: "Audience must be Women, Men, or Kids" },
+      400,
+    );
+  }
   const parsed = catalogueQuerySchema.safeParse(context.req.query());
   if (!parsed.success) {
     return context.json(

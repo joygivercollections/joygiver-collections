@@ -1,5 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { hashSessionToken, SESSION_COOKIE } from "../../worker/lib/session";
+import type { ProductInput } from "../../shared/validation";
 
 export const storeOrigin = "https://joygivercollections.com";
 export const adminToken = "test-admin-session";
@@ -15,9 +16,9 @@ export const validProductInput = {
   stockQuantity: 2,
   featured: true,
   published: true,
-  audiences: ["women"] as const,
+  audiences: ["women"],
   isUnisex: false,
-};
+} satisfies ProductInput;
 
 export async function resetStore() {
   await env.DB.batch([
@@ -76,7 +77,7 @@ export function adminRequest(path: string, init: RequestInit = {}) {
 }
 
 export async function createProduct(
-  overrides: Partial<typeof validProductInput> = {},
+  overrides: Partial<ProductInput> = {},
 ) {
   const response = await adminRequest("/api/admin/products", {
     method: "POST",

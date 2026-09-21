@@ -25,8 +25,8 @@ export interface ProductSummary {
   priceKobo: number;
   condition: ProductCondition;
   category: CategorySummary;
-  audiences?: Audience[];
-  isUnisex?: boolean;
+  audiences: Audience[];
+  isUnisex: boolean;
   promoEligible?: boolean;
   sizes: string[];
   tags: string[];
@@ -51,6 +51,7 @@ export interface AdminProduct extends Omit<Product, "publishedAt"> {
 export interface AdminCategory extends CategorySummary {
   active: boolean;
   displayOrder: number;
+  audiences: Audience[];
 }
 
 export interface InventorySummary {
