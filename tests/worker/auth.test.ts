@@ -76,7 +76,7 @@ describe("password hashing", () => {
 
     expect(await verifyPassword(ownerPassword, stored)).toBe(true);
     expect(await verifyPassword("wrong password", stored)).toBe(false);
-    expect(stored).toMatch(/^pbkdf2-sha256\$310000\$/);
+    expect(stored).toMatch(/^pbkdf2-sha256\$100000\$/);
     expect(stored).not.toContain(ownerPassword);
   });
 });
