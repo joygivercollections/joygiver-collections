@@ -34,6 +34,7 @@ export function AdminLayout() {
           <NavLink to="/owner/wholesale"><span aria-hidden="true">□</span> Wholesale</NavLink>
           <NavLink to="/owner/promotions"><span aria-hidden="true">%</span> Promotions</NavLink>
           <NavLink to="/owner/categories"><span aria-hidden="true">☷</span> Clothing Types</NavLink>
+          <NavLink to="/owner/site-settings"><span aria-hidden="true">✦</span> Site Settings</NavLink>
           <NavLink to="/owner/account"><span aria-hidden="true">○</span> Account</NavLink>
         </nav>
         <div className="admin-sidebar__bottom">
@@ -44,7 +45,7 @@ export function AdminLayout() {
       </aside>
       <div className="admin-main">
         <header className="admin-mobile-head"><NavLink to="/owner" className="admin-brand"><span>J</span><strong>Joygiver</strong></NavLink><NavLink to="/owner/products/new" className="button button--dark">Add product</NavLink></header>
-        <nav className="admin-mobile-nav" aria-label="Dashboard sections"><NavLink end to="/owner">Overview</NavLink><NavLink to="/owner/products">Products</NavLink><NavLink to="/owner/wholesale">Wholesale</NavLink><NavLink to="/owner/promotions">Promotions</NavLink><NavLink to="/owner/categories">Clothing Types</NavLink><NavLink to="/owner/account">Account</NavLink></nav>
+        <nav className="admin-mobile-nav" aria-label="Dashboard sections"><NavLink end to="/owner">Overview</NavLink><NavLink to="/owner/products">Products</NavLink><NavLink to="/owner/wholesale">Wholesale</NavLink><NavLink to="/owner/promotions">Promotions</NavLink><NavLink to="/owner/categories">Clothing Types</NavLink><NavLink to="/owner/site-settings">Site Settings</NavLink><NavLink to="/owner/account">Account</NavLink></nav>
         <Outlet context={{ owner }} />
       </div>
     </div>

@@ -5,6 +5,7 @@ import { listActiveCategories } from "../db/categories";
 import { getPublicProduct, listPublicProducts, validateCart } from "../db/products";
 import { getPublicWholesalePackage, listPublicWholesale } from "../db/wholesale";
 import { getPublicPromotion } from "../db/promotions";
+import { getSiteSettings } from "../db/site-settings";
 
 interface PublicBindings {
   DB: D1Database;
@@ -70,6 +71,7 @@ publicRoutes.get("/config", (context) =>
 );
 
 publicRoutes.get("/promotion", async (context) => context.json(await getPublicPromotion(context.env.DB, new Date())));
+publicRoutes.get("/settings", async (context) => context.json(await getSiteSettings(context.env.DB)));
 
 publicRoutes.get("/categories", async (context) => {
   const rawAudience = context.req.query("audience");

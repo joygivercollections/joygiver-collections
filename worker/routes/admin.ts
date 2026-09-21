@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { audienceSchema, productInputSchema, promotionInputSchema, wholesalePackageInputSchema } from "../../shared/validation";
+import { audienceSchema, productInputSchema, promotionInputSchema, siteSettingsInputSchema, wholesalePackageInputSchema } from "../../shared/validation";
 import {
   CategoryAudienceConflictError,
   createCategory,
@@ -43,6 +43,7 @@ import {
   PromotionScheduleOverlapError,
   updateAdminPromotion,
 } from "../db/promotions";
+import { getSiteSettings, replaceSiteAsset, updateSiteCopy } from "../db/site-settings";
 import { requireSameOrigin } from "../lib/origin";
 import { getAdminFromRequest } from "../lib/session";
 
@@ -488,6 +489,27 @@ adminRoutes.put("/promotions/:id", async (context) => {
 adminRoutes.delete("/promotions/:id", async (context) => {
   const deleted = await deleteAdminPromotion(context.env.DB, context.req.param("id"));
   return deleted ? context.body(null, 204) : context.json({ status: 404, code: "promotion_not_found", message: "Promotion was not found" }, 404);
+});
+
+adminRoutes.get("/settings", async (context) => context.json(await getSiteSettings(context.env.DB)));
+
+adminRoutes.put("/settings", async (context) => {
+  const parsed = siteSettingsInputSchema.safeParse(await readJson(context.req.raw));
+  if (!parsed.success) return context.json({ status: 400, code: "invalid_site_settings", message: "Site copy is invalid", fieldErrors: parsed.error.flatten().fieldErrors }, 400);
+  return context.json(await updateSiteCopy(context.env.DB, parsed.data));
+});
+
+adminRoutes.post("/settings/:slot", async (context) => {
+  const slot = context.req.param("slot");
+  if (slot !== "logo" && slot !== "hero") return context.json({ status: 400, code: "invalid_site_asset", message: "Choose the logo or hero slot" }, 400);
+  const form = await context.req.formData();
+  const file = form.get("image");
+  if (!(file instanceof File)) return context.json({ status: 400, code: "image_required", message: "Choose one image" }, 400);
+  try { return context.json(await replaceSiteAsset(context.env.DB, context.env.PRODUCT_IMAGES, slot, file)); }
+  catch (error) {
+    if (error instanceof ImageStorageError) return context.json({ status: error.status, code: error.code, message: error.message }, error.status);
+    throw error;
+  }
 });
 
 adminRoutes.get("/categories", async (context) =>

@@ -16,6 +16,7 @@ import type {
   AdminWholesalePackage,
   PromotionSummary,
   AdminPromotion,
+  SiteSettings,
 } from "../shared/contracts";
 import type { ProductInput, PromotionInput, WholesalePackageInput } from "../shared/validation";
 
@@ -123,6 +124,10 @@ export function getActivePromotion(signal?: AbortSignal) {
   return requestJson<PromotionSummary | null>("/api/promotion", signal);
 }
 
+export function getSiteSettings(signal?: AbortSignal) {
+  return requestJson<SiteSettings>("/api/settings", signal);
+}
+
 export function validateCart(lines: import("../shared/contracts").FamilyCartLine[], signal?: AbortSignal) {
   return requestJson<import("../shared/contracts").ValidatedCart>("/api/cart/validate", signal, {
     method: "POST",
@@ -193,6 +198,12 @@ export const ownerApi = {
   createPromotion: (input: PromotionInput) => requestJson<AdminPromotion>("/api/admin/promotions", undefined, jsonRequest("POST", input)),
   updatePromotion: (id: string, input: PromotionInput) => requestJson<AdminPromotion>(`/api/admin/promotions/${encodeURIComponent(id)}`, undefined, jsonRequest("PUT", input)),
   deletePromotion: (id: string) => requestJson<void>(`/api/admin/promotions/${encodeURIComponent(id)}`, undefined, { method: "DELETE" }),
+  settings: (signal?: AbortSignal) => requestJson<SiteSettings>("/api/admin/settings", signal),
+  updateSettings: (input: { heroHeading: string; heroCopy: string }) => requestJson<SiteSettings>("/api/admin/settings", undefined, jsonRequest("PUT", input)),
+  replaceSiteAsset: async (slot: "logo" | "hero", file: File) => {
+    const body = new FormData(); body.append("image", file);
+    return requestJson<SiteSettings>(`/api/admin/settings/${slot}`, undefined, { method: "POST", body });
+  },
   uploadImage: async (productId: string, file: File): Promise<ProductImage> => {
     const body = new FormData();
     body.append("images", file);
