@@ -10,7 +10,7 @@ beforeEach(() => localStorage.clear());
 describe("guest cart storage", () => {
   it("persists item selection and restores a versioned cart", () => {
     saveCart([lineA, lineB]);
-    expect(loadCart().map(({ productId, selected }) => ({ productId, selected }))).toEqual([
+    expect(loadCart().map((line) => ({ productId: line.itemType === "wholesale" ? line.packageId : line.productId, selected: line.selected }))).toEqual([
       { productId: lineA.productId, selected: false },
       { productId: lineB.productId, selected: true },
     ]);

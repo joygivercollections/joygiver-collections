@@ -403,6 +403,22 @@
 .account-form small { color: var(--muted); letter-spacing: 0; text-transform: none; }
 .account-form .admin-notice { margin: 18px 0 0; }
 .account-form .button { margin-top: 24px; }
+.wholesale-page { padding-block: 64px 100px; }
+.wholesale-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 34px 0 48px; padding: 22px; border: 1px solid var(--border); }
+.wholesale-filters label { display: grid; gap: 6px; font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.wholesale-filters input, .wholesale-filters select { min-width: 0; height: 44px; border: 1px solid var(--border); padding: 0 10px; background: white; }
+.wholesale-filters > label:first-child, .wholesale-filters .button { grid-column: 1 / -1; }
+.wholesale-grid { display: grid; gap: 38px 18px; }
+.wholesale-card { display: grid; gap: 16px; }
+.wholesale-card__image { position: relative; aspect-ratio: 4 / 3; display: grid; place-items: center; overflow: hidden; background: var(--cream); }
+.wholesale-card__image img { width: 100%; height: 100%; object-fit: cover; }
+.wholesale-card__body { display: grid; gap: 7px; }
+.wholesale-card__body h2 { font-size: 1.45rem; }
+.wholesale-card__body > div { display: flex; justify-content: space-between; gap: 14px; border-top: 1px solid var(--border); padding-top: 11px; }
+.wholesale-card__body > p:last-child { color: var(--muted); font-size: .72rem; }
+.wholesale-detail { padding-block: 34px 100px; }
+.wholesale-detail .product-info > label { display: grid; gap: 8px; margin: 22px 0; font-size: .68rem; font-weight: 700; text-transform: uppercase; }
+.wholesale-detail .product-info > label input { width: 110px; height: 46px; border: 1px solid var(--border); padding: 0 12px; }
 
 .site-footer { padding-top: 65px; background: var(--charcoal); color: #e9e4da; }
 .site-footer__grid { display: grid; gap: 36px; }
@@ -485,6 +501,10 @@
   .category-create { grid-template-columns: 1fr auto; align-items: end; }
   .category-list article { grid-template-columns: 38px 1fr 130px 80px auto auto; }
   .category-list article > label:nth-of-type(2), .category-list article > .status { grid-column: auto; }
+  .wholesale-filters { grid-template-columns: repeat(5, minmax(120px, 1fr)); }
+  .wholesale-filters > label:first-child { grid-column: span 2; }
+  .wholesale-filters .button { grid-column: auto; align-self: end; }
+  .wholesale-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (min-width: 1000px) {

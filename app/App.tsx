@@ -13,6 +13,10 @@ import { CategoriesPage } from "./admin/CategoriesPage";
 import { AccountPage } from "./admin/AccountPage";
 import { AboutPage } from "./pages/AboutPage";
 import { ContactPage } from "./pages/ContactPage";
+import { WholesalePage } from "./pages/WholesalePage";
+import { WholesaleDetailPage } from "./pages/WholesaleDetailPage";
+import { WholesalePage as AdminWholesalePage } from "./admin/WholesalePage";
+import { WholesaleForm } from "./admin/WholesaleForm";
 
 export function App() {
   return (
@@ -23,6 +27,9 @@ export function App() {
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/new" element={<ProductForm />} />
         <Route path="products/:id" element={<ProductForm />} />
+        <Route path="wholesale" element={<AdminWholesalePage />} />
+        <Route path="wholesale/new" element={<WholesaleForm />} />
+        <Route path="wholesale/:id" element={<WholesaleForm />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>
@@ -35,6 +42,8 @@ export function App() {
         <Route path="search" element={<CataloguePage />} />
         <Route path="product/:slug" element={<ProductPage />} />
         <Route path="cart" element={<CartPage />} />
+        <Route path="wholesale" element={<WholesalePage />} />
+        <Route path="wholesale/:slug" element={<WholesaleDetailPage />} />
         <Route path="about" element={<AboutPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

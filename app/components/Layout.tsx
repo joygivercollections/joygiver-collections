@@ -47,6 +47,7 @@ export function Layout() {
             <NavLink to="/">Home</NavLink>
             <NavLink to="/new">New</NavLink>
             <NavLink to="/thrifted">Thrifted</NavLink>
+            <NavLink to="/wholesale">Wholesale</NavLink>
             <NavLink to="/about">About Us</NavLink>
             <NavLink to="/contact">Contact</NavLink>
           </nav>
@@ -97,6 +98,7 @@ export function Layout() {
             <p className="eyebrow">Shop</p>
             <NavLink to="/new">New collection</NavLink>
             <NavLink to="/thrifted">Thrifted collection</NavLink>
+            <NavLink to="/wholesale">Wholesale packages</NavLink>
           </div>
           <div>
             <p className="eyebrow">Delivery</p>

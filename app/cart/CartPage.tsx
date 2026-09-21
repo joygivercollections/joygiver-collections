@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { InvalidCartReason, ValidatedCart, ValidatedCartLine } from "../../shared/contracts";
+import type { InvalidCartReason, RetailCartLine, ValidatedCart } from "../../shared/contracts";
 import { formatNaira, getStoreConfig, validateCart } from "../api";
 import { storeConfig } from "../config";
 import { removeCartLine, saveCart, setAllSelected, setQuantity, setSelected, useCart } from "./cart-store";
@@ -24,7 +24,8 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
   const [validationError, setValidationError] = useState(false);
   const [resolvedWhatsAppNumber, setResolvedWhatsAppNumber] = useState(whatsAppNumber ?? storeConfig.whatsAppNumber);
   const selected = useMemo(() => lines.filter((line) => line.selected), [lines]);
-  const validationKey = selected.map((line) => `${line.productId}:${line.size}:${line.quantity}:${line.lastKnownPriceKobo}`).join("|");
+  const selectedRetail = useMemo(() => selected.filter((line): line is RetailCartLine => line.itemType !== "wholesale"), [selected]);
+  const validationKey = selectedRetail.map((line) => `${line.productId}:${line.size}:${line.quantity}:${line.lastKnownPriceKobo}`).join("|");
 
   useEffect(() => {
     if (whatsAppNumber || resolvedWhatsAppNumber) return;
@@ -34,7 +35,7 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
   }, [whatsAppNumber, resolvedWhatsAppNumber]);
 
   useEffect(() => {
-    if (selected.length === 0) {
+    if (selectedRetail.length === 0) {
       setValidation({ valid: [], invalid: [], subtotalKobo: 0 });
       setChecking(false);
       return;
@@ -42,13 +43,14 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
     const controller = new AbortController();
     setChecking(true);
     setValidationError(false);
-    validateCart(selected, controller.signal)
+    validateCart(selectedRetail, controller.signal)
       .then((result) => {
         setValidation(result);
         const invalidKeys = new Set(result.invalid.map((line) => `${line.productId}:${line.size}`));
         const validByKey = new Map(result.valid.map((line) => [`${line.productId}:${line.size}`, line]));
         let changed = false;
         const next = lines.map((line) => {
+          if (line.itemType === "wholesale") return line;
           const key = `${line.productId}:${line.size}`;
           if (invalidKeys.has(key) && line.selected) {
             changed = true;
@@ -71,7 +73,7 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
     // The serialized key intentionally represents only the selected order payload.
   }, [validationKey]);
 
-  const validatedItems = validation.valid.filter((line) => lines.some((item) => item.productId === line.productId && item.size === line.size && item.selected));
+  const validatedItems = validation.valid.filter((line) => lines.some((item) => item.itemType !== "wholesale" && item.productId === line.productId && item.size === line.size && item.selected));
   const subtotalKobo = validatedItems.reduce((total, item) => total + item.canonicalPriceKobo * item.quantity, 0);
   const message = buildWhatsAppMessage({ customerName, deliveryLocation, items: validatedItems, subtotalKobo });
   const whatsAppUrl = resolvedWhatsAppNumber ? buildWhatsAppUrl(resolvedWhatsAppNumber, message) : "";
@@ -105,12 +107,15 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
           </div>
           <div className="cart-lines">
             {lines.map((line) => {
-              const unavailable = validation.invalid.find((item) => item.productId === line.productId && item.size === line.size);
-              const corrected = validation.valid.find((item) => item.productId === line.productId && item.size === line.size && item.priceChanged);
+              const wholesale = line.itemType === "wholesale";
+              const id = wholesale ? line.packageId : line.productId;
+              const size = wholesale ? "" : line.size;
+              const unavailable = wholesale ? undefined : validation.invalid.find((item) => item.productId === line.productId && item.size === line.size);
+              const corrected = wholesale ? undefined : validation.valid.find((item) => item.productId === line.productId && item.size === line.size && item.priceChanged);
               return (
-                <article className={`cart-line${unavailable ? " cart-line--unavailable" : ""}`} key={`${line.productId}:${line.size}`}>
+                <article className={`cart-line${unavailable ? " cart-line--unavailable" : ""}`} key={`${wholesale ? "wholesale" : "retail"}:${id}:${size}`}>
                   <label className="cart-line__select">
-                    <input type="checkbox" aria-label={line.name} checked={line.selected} disabled={Boolean(unavailable)} onChange={(event) => setSelected(line.productId, event.target.checked, line.size)} />
+                    <input type="checkbox" aria-label={line.name} checked={line.selected} disabled={Boolean(unavailable)} onChange={(event) => setSelected(id, event.target.checked, size)} />
                     <span aria-hidden="true" />
                   </label>
                   <div className="cart-line__image">
@@ -119,7 +124,7 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
                   <div className="cart-line__details">
                     <p className="eyebrow">{line.reference}</p>
                     <h3>{line.name}</h3>
-                    <p>Size: {line.size}</p>
+                    <p>{wholesale ? "Wholesale package" : `Size: ${line.size}`}</p>
                     <p className="cart-line__price">{formatNaira(line.lastKnownPriceKobo)}</p>
                     {unavailable ? <p className="cart-line__notice" role="status">{invalidMessages[unavailable.reason]}</p> : null}
                     {corrected ? <p className="cart-line__notice" role="status">Price updated to {formatNaira(corrected.canonicalPriceKobo)}.</p> : null}
@@ -127,12 +132,12 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
                   <div className="cart-line__controls">
                     <label>Quantity
                       <span className="quantity-control">
-                        <button type="button" aria-label={`Reduce ${line.name} quantity`} onClick={() => setQuantity(line.productId, line.size, line.quantity - 1)} disabled={line.quantity <= 1 || Boolean(unavailable)}>−</button>
+                        <button type="button" aria-label={`Reduce ${line.name} quantity`} onClick={() => setQuantity(id, size, line.quantity - 1)} disabled={line.quantity <= 1 || Boolean(unavailable)}>−</button>
                         <output aria-label={`${line.name} quantity`}>{line.quantity}</output>
-                        <button type="button" aria-label={`Increase ${line.name} quantity`} onClick={() => setQuantity(line.productId, line.size, line.quantity + 1)} disabled={Boolean(unavailable)}>+</button>
+                        <button type="button" aria-label={`Increase ${line.name} quantity`} onClick={() => setQuantity(id, size, line.quantity + 1)} disabled={Boolean(unavailable)}>+</button>
                       </span>
                     </label>
-                    <button className="remove-button" type="button" onClick={() => removeCartLine(line.productId, line.size)}>Remove</button>
+                    <button className="remove-button" type="button" onClick={() => removeCartLine(id, size)}>Remove</button>
                   </div>
                 </article>
               );
