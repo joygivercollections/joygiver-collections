@@ -2,13 +2,14 @@ import type {
   AdminProduct,
   Audience,
   CatalogueFilters,
-  CartLine,
+  FamilyCartLine,
   InventorySummary,
   Paginated,
   Product,
   ProductImage,
   ProductSummary,
   ValidatedCart,
+  ValidatedFamilyCartLine,
 } from "../../shared/contracts";
 import type { ProductInput } from "../../shared/validation";
 import {
@@ -19,6 +20,8 @@ import {
   storeRegisteredImage,
 } from "../lib/images";
 import { getActivePromotion } from "./promotions";
+import { getWholesaleForCart } from "./wholesale";
+import { calculatePromotion } from "../lib/promotions";
 
 const SOLD_VISIBILITY_MS = 48 * 60 * 60 * 1_000;
 
@@ -685,18 +688,17 @@ export async function listAdminProducts(
   };
 }
 
-interface CartValidationInput {
-  productId: string;
-  size: string;
-  quantity: number;
-  lastKnownPriceKobo: number;
-}
+type CartValidationInput =
+  | { itemType?: "retail"; productId: string; size: string; quantity: number; lastKnownPriceKobo: number }
+  | { itemType: "wholesale"; packageId: string; quantity: number; lastKnownPriceKobo: number };
 
 export async function validateCart(
   db: D1Database,
   items: CartValidationInput[],
 ): Promise<ValidatedCart> {
-  const ids = Array.from(new Set(items.map((item) => item.productId)));
+  const retailInputs = items.filter((item): item is Extract<CartValidationInput, { productId: string }> => item.itemType !== "wholesale");
+  const wholesaleInputs = items.filter((item): item is Extract<CartValidationInput, { itemType: "wholesale" }> => item.itemType === "wholesale");
+  const ids = Array.from(new Set(retailInputs.map((item) => item.productId)));
   const placeholders = ids.map(() => "?").join(", ");
   const rows = ids.length
     ? await db
@@ -705,12 +707,27 @@ export async function validateCart(
         .all<ProductRow>()
     : { results: [] as ProductRow[] };
   const byId = new Map(rows.results.map((row) => [row.id, row]));
+  const wholesaleRows = await getWholesaleForCart(db, Array.from(new Set(wholesaleInputs.map((item) => item.packageId))));
+  const wholesaleById = new Map(wholesaleRows.map((row) => [row.id, row]));
   const valid: ValidatedCart["valid"] = [];
   const invalid: ValidatedCart["invalid"] = [];
 
   for (const input of items) {
+    if (input.itemType === "wholesale") {
+      const row = wholesaleById.get(input.packageId);
+      const baseLine: FamilyCartLine = { itemType: "wholesale", packageId: input.packageId, reference: row?.reference ?? "Unavailable", name: row?.name ?? "Unavailable package", quantity: input.quantity, lastKnownPriceKobo: input.lastKnownPriceKobo, imageUrl: row?.primaryImage?.url ?? null, selected: true };
+      if (!row) { invalid.push({ ...baseLine, reason: "deleted" }); continue; }
+      if (row.state === "sold") { invalid.push({ ...baseLine, reason: "sold" }); continue; }
+      if (row.state === "hidden" || !row.published) { invalid.push({ ...baseLine, reason: "hidden" }); continue; }
+      if (row.stockQuantity <= 0) { invalid.push({ ...baseLine, reason: "out_of_stock" }); continue; }
+      const quantity = Math.min(input.quantity, row.stockQuantity);
+      if (quantity < input.quantity) invalid.push({ ...baseLine, quantity, reason: "quantity_reduced" });
+      valid.push({ ...baseLine, reference: row.reference, name: row.name, quantity, canonicalPriceKobo: row.priceKobo, priceChanged: row.priceKobo !== input.lastKnownPriceKobo, discountedQuantity: 0, discountKobo: 0 });
+      continue;
+    }
     const row = byId.get(input.productId);
-    const baseLine: CartLine = {
+    const baseLine: FamilyCartLine = {
+      itemType: "retail",
       productId: input.productId,
       reference: row?.reference ?? "Unavailable",
       name: row?.name ?? "Unavailable product",
@@ -743,23 +760,50 @@ export async function validateCart(
     }
     if (input.quantity > availableQuantity) {
       invalid.push({ ...baseLine, quantity: availableQuantity, reason: "quantity_reduced" });
-      continue;
     }
     valid.push({
       ...baseLine,
       reference: row.reference,
       name: row.name,
+      quantity: Math.min(input.quantity, availableQuantity),
       canonicalPriceKobo: row.price_kobo,
       priceChanged: row.price_kobo !== input.lastKnownPriceKobo,
+      discountedQuantity: 0,
+      discountKobo: 0,
     });
   }
+
+  const regularSubtotalKobo = valid.reduce((sum, line) => sum + line.canonicalPriceKobo * line.quantity, 0);
+  const promotion = await getActivePromotion(db, new Date());
+  let promotionBreakdown: ValidatedCart["promotion"] = null;
+  let discountKobo = 0;
+  if (promotion) {
+    const eligibleProducts = new Set(promotion.productIds);
+    const eligiblePackages = new Set(promotion.wholesalePackageIds);
+    const calculated = calculatePromotion(valid.map((line) => ({
+      key: line.itemType === "wholesale" ? `wholesale:${line.packageId}` : `retail:${line.productId}:${line.size}`,
+      unitPriceKobo: line.canonicalPriceKobo,
+      quantity: line.quantity,
+      eligible: line.itemType === "wholesale" ? eligiblePackages.has(line.packageId) : eligibleProducts.has(line.productId),
+    })), promotion);
+    const allocations = new Map(calculated.lines.map((line) => [line.key, line]));
+    for (let index = 0; index < valid.length; index += 1) {
+      const line = valid[index];
+      const key = line.itemType === "wholesale" ? `wholesale:${line.packageId}` : `retail:${line.productId}:${line.size}`;
+      const allocation = allocations.get(key) ?? { discountedQuantity: 0, discountKobo: 0 };
+      valid[index] = { ...line, ...allocation } as ValidatedFamilyCartLine;
+    }
+    discountKobo = calculated.discountKobo;
+    promotionBreakdown = { id: promotion.id, name: promotion.name, requiredQuantity: promotion.requiredQuantity, discountBasisPoints: promotion.discountBasisPoints, eligibleQuantity: calculated.eligibleQuantity, discountedQuantity: calculated.discountedQuantity, discountKobo };
+  }
+  const finalSubtotalKobo = regularSubtotalKobo - discountKobo;
   return {
     valid,
     invalid,
-    subtotalKobo: valid.reduce(
-      (sum, line) => sum + line.canonicalPriceKobo * line.quantity,
-      0,
-    ),
+    subtotalKobo: finalSubtotalKobo,
+    regularSubtotalKobo,
+    promotion: promotionBreakdown,
+    finalSubtotalKobo,
   };
 }
 

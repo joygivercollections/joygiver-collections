@@ -3,10 +3,10 @@ import type { FamilyCartLine, ProductCondition, RetailCartLine, WholesaleCartLin
 
 const STORAGE_KEY = "joygiver-cart";
 const CHANGE_EVENT = "joygiver-cart-change";
-const VERSION = 1;
+const VERSION = 2;
 
 interface StoredCart {
-  version: 1;
+  version: 2;
   lines: FamilyCartLine[];
 }
 
@@ -28,6 +28,14 @@ function isCartLine(value: unknown): value is FamilyCartLine {
     && typeof line.selected === "boolean";
 }
 
+function isVersionTwoLine(value: unknown): value is FamilyCartLine {
+  return isCartLine(value) && (value as { itemType?: unknown }).itemType !== undefined;
+}
+
+function isLegacyRetailLine(value: unknown): value is RetailCartLine {
+  return isCartLine(value) && (value as { itemType?: unknown }).itemType !== "wholesale";
+}
+
 export function loadCart(): FamilyCartLine[] {
   if (typeof localStorage === "undefined") return [];
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -35,10 +43,12 @@ export function loadCart(): FamilyCartLine[] {
   cachedRaw = raw;
   if (!raw) return (cachedLines = []);
   try {
-    const stored = JSON.parse(raw) as Partial<StoredCart>;
-    if (stored.version !== VERSION || !Array.isArray(stored.lines) || !stored.lines.every(isCartLine)) {
-      return (cachedLines = []);
+    const stored = JSON.parse(raw) as { version?: unknown; lines?: unknown };
+    if (!Array.isArray(stored.lines)) return (cachedLines = []);
+    if (stored.version === 1 && stored.lines.every(isLegacyRetailLine)) {
+      return (cachedLines = stored.lines.map((line) => ({ ...line, itemType: "retail" as const })));
     }
+    if (stored.version !== VERSION || !stored.lines.every(isVersionTwoLine)) return (cachedLines = []);
     return (cachedLines = stored.lines);
   } catch {
     return (cachedLines = []);
@@ -47,25 +57,27 @@ export function loadCart(): FamilyCartLine[] {
 
 export function saveCart(lines: FamilyCartLine[]): void {
   if (typeof localStorage === "undefined") return;
-  const value: StoredCart = { version: VERSION, lines };
+  const normalized = lines.map((line) => line.itemType === "wholesale" ? line : { ...line, itemType: "retail" as const });
+  const value: StoredCart = { version: VERSION, lines: normalized };
   cachedRaw = JSON.stringify(value);
-  cachedLines = lines;
+  cachedLines = normalized;
   localStorage.setItem(STORAGE_KEY, cachedRaw);
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 }
 
 export function upsertCartLine(line: RetailCartLine, condition: ProductCondition): FamilyCartLine[] {
+  const normalizedLine: RetailCartLine = { ...line, itemType: "retail" };
   const current = loadCart();
-  const index = current.findIndex((item) => item.itemType !== "wholesale" && item.productId === line.productId && item.size === line.size);
+  const index = current.findIndex((item) => item.itemType !== "wholesale" && item.productId === normalizedLine.productId && item.size === normalizedLine.size);
   const next = [...current];
   if (index === -1) {
-    next.push({ ...line, quantity: condition === "thrifted" ? 1 : Math.max(1, line.quantity), selected: true });
+    next.push({ ...normalizedLine, quantity: condition === "thrifted" ? 1 : Math.max(1, normalizedLine.quantity), selected: true });
   } else {
     const existing = current[index];
     next[index] = {
       ...existing,
-      ...line,
-      quantity: condition === "thrifted" ? 1 : Math.max(1, existing.quantity + line.quantity),
+      ...normalizedLine,
+      quantity: condition === "thrifted" ? 1 : Math.max(1, existing.quantity + normalizedLine.quantity),
       selected: true,
     };
   }

@@ -97,16 +97,24 @@ export const siteSettingsInputSchema = z.object({
 
 export type SiteSettingsInput = z.infer<typeof siteSettingsInputSchema>;
 
-const cartValidationLineSchema = z.object({
+const retailCartValidationLineSchema = z.object({
+  itemType: z.literal("retail").optional(),
   productId: z.string().trim().min(1).max(80),
   size: z.string().trim().min(1).max(80),
   quantity: z.number().int().min(1).max(999),
   lastKnownPriceKobo: z.number().int().positive().safe(),
 });
 
+const wholesaleCartValidationLineSchema = z.object({
+  itemType: z.literal("wholesale"),
+  packageId: z.string().trim().min(1).max(80),
+  quantity: z.number().int().min(1).max(999),
+  lastKnownPriceKobo: z.number().int().positive().safe(),
+});
+
 export const cartValidationSchema = z.object({
   items: z
-    .array(cartValidationLineSchema)
+    .array(z.union([wholesaleCartValidationLineSchema, retailCartValidationLineSchema]))
     .min(1, "Select at least one item")
     .max(50, "A maximum of 50 items can be checked at once"),
 });

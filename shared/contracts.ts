@@ -199,7 +199,7 @@ export type InvalidCartReason =
   | "size_unavailable"
   | "quantity_reduced";
 
-export type InvalidCartLine = CartLine & { reason: InvalidCartReason };
+export type InvalidCartLine = FamilyCartLine & { reason: InvalidCartReason };
 
 export interface PromotionBreakdown {
   id: string;
@@ -212,7 +212,7 @@ export interface PromotionBreakdown {
 }
 
 export interface ValidatedCart {
-  valid: ValidatedCartLine[];
+  valid: Array<ValidatedCartLine | ValidatedFamilyCartLine>;
   invalid: InvalidCartLine[];
   subtotalKobo: number;
   regularSubtotalKobo?: number;

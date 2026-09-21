@@ -45,3 +45,20 @@ it("lets a guest choose only one cart line for the order", async () => {
   await waitFor(() => expect(screen.getByRole("link", { name: /order 1 selected item/i })).toBeVisible());
   expect(screen.getByText(/selected subtotal/i).nextElementSibling).toHaveTextContent("₦28,500");
 });
+
+it("announces progress toward the next complete promotion group", async () => {
+  const line = { ...available, quantity: 4 };
+  saveCart([line]);
+  const validated: ValidatedCart = {
+    valid: [{ ...line, itemType: "retail", canonicalPriceKobo: line.lastKnownPriceKobo, priceChanged: false, discountedQuantity: 0, discountKobo: 0 }],
+    invalid: [],
+    subtotalKobo: line.lastKnownPriceKobo * 4,
+    regularSubtotalKobo: line.lastKnownPriceKobo * 4,
+    promotion: { id: "promo", name: "Complete six", requiredQuantity: 6, discountBasisPoints: 1500, eligibleQuantity: 4, discountedQuantity: 0, discountKobo: 0 },
+    finalSubtotalKobo: line.lastKnownPriceKobo * 4,
+  };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(validated), { status: 200, headers: { "Content-Type": "application/json" } })));
+
+  render(<MemoryRouter><CartPage whatsAppNumber="2348030000000" /></MemoryRouter>);
+  expect(await screen.findByText(/4 of 6 eligible items selected—add 2 more to unlock 15% off/i)).toBeVisible();
+});

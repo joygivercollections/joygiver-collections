@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { InvalidCartReason, RetailCartLine, ValidatedCart } from "../../shared/contracts";
+import type { FamilyCartLine, InvalidCartReason, ValidatedCart, ValidatedFamilyCartLine } from "../../shared/contracts";
 import { formatNaira, getStoreConfig, validateCart } from "../api";
 import { storeConfig } from "../config";
 import { removeCartLine, saveCart, setAllSelected, setQuantity, setSelected, useCart } from "./cart-store";
@@ -24,8 +24,8 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
   const [validationError, setValidationError] = useState(false);
   const [resolvedWhatsAppNumber, setResolvedWhatsAppNumber] = useState(whatsAppNumber ?? storeConfig.whatsAppNumber);
   const selected = useMemo(() => lines.filter((line) => line.selected), [lines]);
-  const selectedRetail = useMemo(() => selected.filter((line): line is RetailCartLine => line.itemType !== "wholesale"), [selected]);
-  const validationKey = selectedRetail.map((line) => `${line.productId}:${line.size}:${line.quantity}:${line.lastKnownPriceKobo}`).join("|");
+  const lineKey = (line: FamilyCartLine) => line.itemType === "wholesale" ? `wholesale:${line.packageId}` : `retail:${line.productId}:${line.size}`;
+  const validationKey = selected.map((line) => `${lineKey(line)}:${line.quantity}:${line.lastKnownPriceKobo}`).join("|");
 
   useEffect(() => {
     if (whatsAppNumber || resolvedWhatsAppNumber) return;
@@ -35,7 +35,7 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
   }, [whatsAppNumber, resolvedWhatsAppNumber]);
 
   useEffect(() => {
-    if (selectedRetail.length === 0) {
+    if (selected.length === 0) {
       setValidation({ valid: [], invalid: [], subtotalKobo: 0 });
       setChecking(false);
       return;
@@ -43,15 +43,14 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
     const controller = new AbortController();
     setChecking(true);
     setValidationError(false);
-    validateCart(selectedRetail, controller.signal)
+    validateCart(selected, controller.signal)
       .then((result) => {
         setValidation(result);
-        const invalidKeys = new Set(result.invalid.map((line) => `${line.productId}:${line.size}`));
-        const validByKey = new Map(result.valid.map((line) => [`${line.productId}:${line.size}`, line]));
+        const invalidKeys = new Set(result.invalid.filter((line) => line.reason !== "quantity_reduced").map(lineKey));
+        const validByKey = new Map(result.valid.map((line) => [lineKey(line), line]));
         let changed = false;
         const next = lines.map((line) => {
-          if (line.itemType === "wholesale") return line;
-          const key = `${line.productId}:${line.size}`;
+          const key = lineKey(line);
           if (invalidKeys.has(key) && line.selected) {
             changed = true;
             return { ...line, selected: false };
@@ -73,11 +72,16 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
     // The serialized key intentionally represents only the selected order payload.
   }, [validationKey]);
 
-  const validatedItems = validation.valid.filter((line) => lines.some((item) => item.itemType !== "wholesale" && item.productId === line.productId && item.size === line.size && item.selected));
-  const subtotalKobo = validatedItems.reduce((total, item) => total + item.canonicalPriceKobo * item.quantity, 0);
-  const message = buildWhatsAppMessage({ customerName, deliveryLocation, items: validatedItems, subtotalKobo });
+  const validatedItems = validation.valid
+    .filter((line) => lines.some((item) => lineKey(item) === lineKey(line) && item.selected))
+    .map((line): ValidatedFamilyCartLine => ({ ...line, itemType: line.itemType === "wholesale" ? "wholesale" : "retail", discountedQuantity: line.discountedQuantity ?? 0, discountKobo: line.discountKobo ?? 0 } as ValidatedFamilyCartLine));
+  const regularSubtotalKobo = validation.regularSubtotalKobo ?? validatedItems.reduce((total, item) => total + item.canonicalPriceKobo * item.quantity, 0);
+  const finalSubtotalKobo = validation.finalSubtotalKobo ?? regularSubtotalKobo - (validation.promotion?.discountKobo ?? 0);
+  const message = buildWhatsAppMessage({ customerName, deliveryLocation, items: validatedItems, regularSubtotalKobo, promotion: validation.promotion ?? null, finalSubtotalKobo });
   const whatsAppUrl = resolvedWhatsAppNumber ? buildWhatsAppUrl(resolvedWhatsAppNumber, message) : "";
   const ready = validatedItems.length > 0 && !checking && !validationError && Boolean(whatsAppUrl);
+  const promotion = validation.promotion ?? null;
+  const remainingToUnlock = promotion && promotion.discountedQuantity === 0 ? Math.max(0, promotion.requiredQuantity - promotion.eligibleQuantity) : 0;
 
   if (lines.length === 0) {
     return (
@@ -110,8 +114,9 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
               const wholesale = line.itemType === "wholesale";
               const id = wholesale ? line.packageId : line.productId;
               const size = wholesale ? "" : line.size;
-              const unavailable = wholesale ? undefined : validation.invalid.find((item) => item.productId === line.productId && item.size === line.size);
-              const corrected = wholesale ? undefined : validation.valid.find((item) => item.productId === line.productId && item.size === line.size && item.priceChanged);
+              const unavailable = validation.invalid.find((item) => lineKey(item) === lineKey(line) && item.reason !== "quantity_reduced");
+              const quantityReduced = validation.invalid.find((item) => lineKey(item) === lineKey(line) && item.reason === "quantity_reduced");
+              const corrected = validation.valid.find((item) => lineKey(item) === lineKey(line) && item.priceChanged);
               return (
                 <article className={`cart-line${unavailable ? " cart-line--unavailable" : ""}`} key={`${wholesale ? "wholesale" : "retail"}:${id}:${size}`}>
                   <label className="cart-line__select">
@@ -127,6 +132,7 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
                     <p>{wholesale ? "Wholesale package" : `Size: ${line.size}`}</p>
                     <p className="cart-line__price">{formatNaira(line.lastKnownPriceKobo)}</p>
                     {unavailable ? <p className="cart-line__notice" role="status">{invalidMessages[unavailable.reason]}</p> : null}
+                    {quantityReduced ? <p className="cart-line__notice" role="status">The available quantity was reduced to {quantityReduced.quantity}.</p> : null}
                     {corrected ? <p className="cart-line__notice" role="status">Price updated to {formatNaira(corrected.canonicalPriceKobo)}.</p> : null}
                   </div>
                   <div className="cart-line__controls">
@@ -148,7 +154,9 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
         <aside className="order-summary" aria-labelledby="summary-title">
           <p className="eyebrow">WhatsApp checkout</p>
           <h2 id="summary-title">Order summary</h2>
-          <div className="summary-total"><p>Selected subtotal</p><strong>{formatNaira(subtotalKobo)}</strong></div>
+          {remainingToUnlock > 0 && promotion ? <p className="promotion-progress" role="status">{promotion.eligibleQuantity} of {promotion.requiredQuantity} eligible items selected—add {remainingToUnlock} more to unlock {promotion.discountBasisPoints / 100}% off.</p> : null}
+          {promotion && promotion.discountedQuantity > 0 ? <div className="promotion-totals" aria-live="polite"><p><span>Regular subtotal</span><strong>{formatNaira(regularSubtotalKobo)}</strong></p><p><span>{promotion.name}</span><strong>-{formatNaira(promotion.discountKobo)}</strong></p></div> : null}
+          <div className="summary-total"><p>Final selected subtotal</p><strong>{formatNaira(finalSubtotalKobo)}</strong></div>
           <p className="summary-note">Delivery is calculated and confirmed with you on WhatsApp.</p>
           <label>Your name <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="e.g. Ada" autoComplete="name" /></label>
           <label>Delivery location <input value={deliveryLocation} onChange={(event) => setDeliveryLocation(event.target.value)} placeholder="Area, city and state" autoComplete="street-address" /></label>

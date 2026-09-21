@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
-import type { ValidatedCartLine } from "../../shared/contracts";
+import type { ValidatedFamilyCartLine } from "../../shared/contracts";
 import { buildWhatsAppMessage, buildWhatsAppUrl } from "../../app/cart/whatsapp";
 
-const gown: ValidatedCartLine = { productId: "a", reference: "JGC-A1B2", name: "Ivory Two-piece Set", size: "M", quantity: 1, lastKnownPriceKobo: 28_500_00, canonicalPriceKobo: 28_500_00, priceChanged: false, imageUrl: null, selected: true };
-const jeans: ValidatedCartLine = { ...gown, productId: "b", reference: "JGC-B2C3", name: "Indigo Jeans", size: "L", canonicalPriceKobo: 13_500_00 };
+const gown: ValidatedFamilyCartLine = { itemType: "retail", productId: "a", reference: "JGC-A1B2", name: "Ivory Two-piece Set", size: "M", quantity: 7, lastKnownPriceKobo: 1_000_000, canonicalPriceKobo: 1_000_000, priceChanged: false, discountedQuantity: 6, discountKobo: 900_000, imageUrl: null, selected: true };
+const bale: ValidatedFamilyCartLine = { itemType: "wholesale", packageId: "w", reference: "JGC-W-B2C3", name: "Denim Bale", quantity: 1, lastKnownPriceKobo: 2_000_000, canonicalPriceKobo: 2_000_000, priceChanged: false, discountedQuantity: 0, discountKobo: 0, imageUrl: null, selected: true };
 
 describe("WhatsApp order formatting", () => {
   it("includes the selected validated order in a stable readable message", () => {
-    const message = buildWhatsAppMessage({ customerName: "Ada", deliveryLocation: "Gwarinpa, Abuja", items: [gown, jeans], subtotalKobo: 42_000_00 });
+    const message = buildWhatsAppMessage({ customerName: "Ada", deliveryLocation: "Gwarinpa, Abuja", items: [gown, bale], regularSubtotalKobo: 9_000_000, promotion: { id: "promo", name: "Complete six", requiredQuantity: 6, discountBasisPoints: 1500, eligibleQuantity: 8, discountedQuantity: 6, discountKobo: 900_000 }, finalSubtotalKobo: 8_100_000 });
     expect(message).toContain("Ada");
     expect(message).toContain("Gwarinpa, Abuja");
     expect(message).toContain(gown.reference);
-    expect(message).toContain(jeans.reference);
-    expect(message).toContain("₦42,000");
+    expect(message).toContain(bale.reference);
+    expect(message).toContain("Wholesale package");
+    expect(message).toContain("6 discounted");
+    expect(message).toContain("₦90,000");
+    expect(message).toContain("-₦9,000");
+    expect(message).toContain("₦81,000");
     expect(message).toContain("not a reservation until confirmed");
   });
 

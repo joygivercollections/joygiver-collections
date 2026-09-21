@@ -123,7 +123,7 @@ export function getActivePromotion(signal?: AbortSignal) {
   return requestJson<PromotionSummary | null>("/api/promotion", signal);
 }
 
-export function validateCart(lines: import("../shared/contracts").CartLine[], signal?: AbortSignal) {
+export function validateCart(lines: import("../shared/contracts").FamilyCartLine[], signal?: AbortSignal) {
   return requestJson<import("../shared/contracts").ValidatedCart>("/api/cart/validate", signal, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
