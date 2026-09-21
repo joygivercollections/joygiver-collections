@@ -3,12 +3,7 @@
   "name": "joygiver-collections",
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-19",
-  "routes": [
-    {
-      "pattern": "joygivercollections.com",
-      "custom_domain": true
-    }
-  ],
+  "workers_dev": true,
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
@@ -17,8 +12,7 @@
     {
       "binding": "DB",
       "database_name": "joygiver-store",
-      // Replace this local placeholder with the identifier returned by `wrangler d1 create` before deployment.
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "d448a559-e96c-4a1c-98eb-e69ad6f97065"
     }
   ],
   "r2_buckets": [
@@ -29,6 +23,6 @@
   ],
   "vars": {
     // Public business phone number in international format, digits only (Nigeria example: 2348030000000).
-    "WHATSAPP_NUMBER": ""
+    "WHATSAPP_NUMBER": "2348069010690"
   }
 }
