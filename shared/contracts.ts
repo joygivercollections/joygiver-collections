@@ -1,10 +1,13 @@
 export type ProductCondition = "new" | "thrifted";
 export type ProductState = "available" | "sold" | "hidden";
+export type Audience = "women" | "men" | "kids";
+export type WholesaleConditionScope = ProductCondition | "mixed";
 
 export interface CategorySummary {
   id: string;
   name: string;
   slug: string;
+  audiences?: Audience[];
 }
 
 export interface ProductImage {
@@ -22,6 +25,9 @@ export interface ProductSummary {
   priceKobo: number;
   condition: ProductCondition;
   category: CategorySummary;
+  audiences?: Audience[];
+  isUnisex?: boolean;
+  promoEligible?: boolean;
   sizes: string[];
   tags: string[];
   stockQuantity: number;
@@ -37,8 +43,7 @@ export interface Product extends ProductSummary {
   images: ProductImage[];
 }
 
-export interface AdminProduct
-  extends Omit<Product, "publishedAt"> {
+export interface AdminProduct extends Omit<Product, "publishedAt"> {
   published: boolean;
   publishedAt: string | null;
 }
@@ -59,10 +64,26 @@ export interface InventorySummary {
 
 export interface CatalogueFilters {
   condition?: ProductCondition;
+  audience?: Audience;
   category?: string;
   size?: string;
   minPriceKobo?: number;
   maxPriceKobo?: number;
+  search?: string;
+  sort?: "latest" | "price-asc" | "price-desc";
+  page?: number;
+  limit?: number;
+}
+
+export interface WholesaleFilters {
+  audience?: Audience;
+  condition?: WholesaleConditionScope;
+  category?: string;
+  minPieceCount?: number;
+  maxPieceCount?: number;
+  minPriceKobo?: number;
+  maxPriceKobo?: number;
+  availability?: "available" | "sold";
   search?: string;
   sort?: "latest" | "price-asc" | "price-desc";
   page?: number;
@@ -76,21 +97,98 @@ export interface Paginated<T> {
   total: number;
 }
 
-export interface CartLine {
-  productId: string;
+export interface WholesalePackageSummary {
+  id: string;
+  reference: string;
+  slug: string;
+  name: string;
+  description: string;
+  audiences: Audience[];
+  conditionScope: WholesaleConditionScope;
+  categories: CategorySummary[];
+  pieceCount: number;
+  priceKobo: number;
+  stockQuantity: number;
+  state: ProductState;
+  soldAt: string | null;
+  featured: boolean;
+  promoEligible?: boolean;
+  primaryImage: Pick<ProductImage, "url" | "alt"> | null;
+  publishedAt: string;
+}
+
+export interface WholesalePackage extends WholesalePackageSummary {
+  images: ProductImage[];
+}
+
+export interface AdminWholesalePackage extends Omit<WholesalePackage, "publishedAt"> {
+  published: boolean;
+  publishedAt: string | null;
+}
+
+export interface PromotionSummary {
+  id: string;
+  name: string;
+  description: string;
+  requiredQuantity: number;
+  discountBasisPoints: number;
+  startAt: string;
+  endAt: string;
+}
+
+export interface AdminPromotion extends PromotionSummary {
+  paused: boolean;
+  productIds: string[];
+  wholesalePackageIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SiteSettings {
+  logoUrl: string;
+  heroUrl: string;
+  heroHeading: string;
+  heroCopy: string;
+}
+
+export type CartItemType = "retail" | "wholesale";
+
+export interface CartLineBase {
   reference: string;
   name: string;
-  size: string;
   quantity: number;
   lastKnownPriceKobo: number;
   imageUrl: string | null;
   selected: boolean;
 }
 
-export interface ValidatedCartLine extends CartLine {
+export interface RetailCartLine extends CartLineBase {
+  itemType?: "retail";
+  productId: string;
+  size: string;
+}
+
+export interface WholesaleCartLine extends CartLineBase {
+  itemType: "wholesale";
+  packageId: string;
+}
+
+export type FamilyCartLine = RetailCartLine | WholesaleCartLine;
+export type CartLine = RetailCartLine;
+
+export type ValidatedCartLine = CartLine & {
   canonicalPriceKobo: number;
   priceChanged: boolean;
-}
+  discountedQuantity?: number;
+  discountKobo?: number;
+};
+
+export type ValidatedFamilyCartLine = FamilyCartLine & {
+  canonicalPriceKobo: number;
+  priceChanged: boolean;
+  discountedQuantity: number;
+  discountKobo: number;
+};
 
 export type InvalidCartReason =
   | "sold"
@@ -100,10 +198,25 @@ export type InvalidCartReason =
   | "size_unavailable"
   | "quantity_reduced";
 
+export type InvalidCartLine = CartLine & { reason: InvalidCartReason };
+
+export interface PromotionBreakdown {
+  id: string;
+  name: string;
+  requiredQuantity: number;
+  discountBasisPoints: number;
+  eligibleQuantity: number;
+  discountedQuantity: number;
+  discountKobo: number;
+}
+
 export interface ValidatedCart {
   valid: ValidatedCartLine[];
-  invalid: Array<CartLine & { reason: InvalidCartReason }>;
+  invalid: InvalidCartLine[];
   subtotalKobo: number;
+  regularSubtotalKobo?: number;
+  promotion?: PromotionBreakdown | null;
+  finalSubtotalKobo?: number;
 }
 
 export interface ApiError {

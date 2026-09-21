@@ -15,11 +15,21 @@ export const validProductInput = {
   stockQuantity: 2,
   featured: true,
   published: true,
+  audiences: ["women"] as const,
+  isUnisex: false,
 };
 
 export async function resetStore() {
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM promotion_products"),
+    env.DB.prepare("DELETE FROM promotion_wholesale_packages"),
+    env.DB.prepare("DELETE FROM promotions"),
+    env.DB.prepare("DELETE FROM wholesale_package_images"),
+    env.DB.prepare("DELETE FROM wholesale_package_categories"),
+    env.DB.prepare("DELETE FROM wholesale_package_audiences"),
+    env.DB.prepare("DELETE FROM wholesale_packages"),
     env.DB.prepare("DELETE FROM product_images"),
+    env.DB.prepare("DELETE FROM product_audiences"),
     env.DB.prepare("DELETE FROM products"),
     env.DB.prepare("DELETE FROM sessions"),
     env.DB.prepare("DELETE FROM login_attempts"),

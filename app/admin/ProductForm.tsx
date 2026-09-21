@@ -75,6 +75,7 @@ export function ProductForm() {
     const input: ProductInput = {
       name: name.trim(), description: description.trim(), priceKobo: Math.round(Number(price) * 100), condition, categoryId,
       sizes, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean), stockQuantity: Number(stock), featured, published,
+      audiences: ["women"], isUnisex: false,
       reference: reference.trim() || undefined,
     };
     const parsed = productInputSchema.safeParse(input);

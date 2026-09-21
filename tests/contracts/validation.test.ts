@@ -2,8 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   cartValidationSchema,
   loginSchema,
+  promotionInputSchema,
   productInputSchema,
+  siteSettingsInputSchema,
+  wholesalePackageInputSchema,
 } from "../../shared/validation";
+
+const audienceFields = {
+  audiences: ["women"] as const,
+  isUnisex: false,
+};
 
 describe("productInputSchema", () => {
   it("accepts a valid new product", () => {
@@ -18,6 +26,7 @@ describe("productInputSchema", () => {
       stockQuantity: 2,
       featured: true,
       published: true,
+      ...audienceFields,
     });
 
     expect(parsed.condition).toBe("new");
@@ -37,6 +46,7 @@ describe("productInputSchema", () => {
         stockQuantity: 2,
         featured: false,
         published: true,
+        ...audienceFields,
       }),
     ).toThrow(/thrifted/i);
   });
@@ -53,9 +63,79 @@ describe("productInputSchema", () => {
       stockQuantity: 1,
       featured: false,
       published: true,
+      ...audienceFields,
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("requires at least one audience", () => {
+    const product = {
+      name: "Ivory Two-piece Set",
+      description: "Soft structured set",
+      priceKobo: 2_850_000,
+      condition: "new",
+      categoryId: "cat_sets",
+      sizes: ["M"],
+      tags: [],
+      stockQuantity: 1,
+      featured: false,
+      published: true,
+      isUnisex: false,
+    };
+
+    expect(productInputSchema.safeParse({ ...product, audiences: [] }).success).toBe(false);
+    expect(productInputSchema.safeParse({ ...product, audiences: ["women"] }).success).toBe(true);
+  });
+});
+
+describe("wholesalePackageInputSchema", () => {
+  it("accepts a mixed family package without exposing internal garments", () => {
+    const parsed = wholesalePackageInputSchema.parse({
+      name: "Family Denim Bale",
+      description: "A mixed wholesale denim package.",
+      audiences: ["women", "men", "kids"],
+      conditionScope: "mixed",
+      categoryIds: ["cat_jeans"],
+      pieceCount: 24,
+      priceKobo: 18_000_000,
+      stockQuantity: 3,
+      featured: true,
+      published: false,
+    });
+
+    expect(parsed.pieceCount).toBe(24);
+    expect(parsed).not.toHaveProperty("garments");
+  });
+});
+
+describe("promotionInputSchema", () => {
+  it("rejects an end time that is not later than the start time", () => {
+    const parsed = promotionInputSchema.safeParse({
+      name: "Six-piece edit",
+      description: "",
+      requiredQuantity: 6,
+      discountBasisPoints: 1_500,
+      startAt: "2026-10-01T09:00:00.000Z",
+      endAt: "2026-10-01T08:59:59.000Z",
+      paused: false,
+      productIds: [],
+      wholesalePackageIds: [],
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("siteSettingsInputSchema", () => {
+  it("trims bounded hero copy", () => {
+    const parsed = siteSettingsInputSchema.parse({
+      heroHeading: "  Style for every story.  ",
+      heroCopy: "  New and thrifted fashion for Women, Men, and Kids.  ",
+    });
+
+    expect(parsed.heroHeading).toBe("Style for every story.");
+    expect(parsed.heroCopy).toBe("New and thrifted fashion for Women, Men, and Kids.");
   });
 });
 

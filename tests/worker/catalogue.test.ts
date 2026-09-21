@@ -126,15 +126,17 @@ describe("listPublicProducts", () => {
 });
 
 describe("public catalogue routes", () => {
-  it("returns the eight active categories", async () => {
+  it("returns all active family clothing types", async () => {
     const response = await exports.default.fetch(
       new Request("https://joygivercollections.com/api/categories"),
     );
 
     expect(response.status).toBe(200);
     const categories = (await response.json()) as Array<{ slug: string }>;
-    expect(categories).toHaveLength(8);
+    expect(categories).toHaveLength(17);
     expect(categories.map((category) => category.slug)).toContain("gowns");
+    expect(categories.map((category) => category.slug)).toContain("shirts");
+    expect(categories.map((category) => category.slug)).toContain("dresses");
   });
 
   it("rejects an unsupported condition and oversized page", async () => {
