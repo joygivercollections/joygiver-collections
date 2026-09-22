@@ -76,6 +76,25 @@ export function CategoriesPage() {
     }
   }
 
+  async function reactivate(category: AdminCategory) {
+    if (category.audiences.length === 0) {
+      setNotice(`${category.name} must belong to at least one audience.`);
+      return;
+    }
+    try {
+      const updated = await ownerApi.updateCategory(category.id, {
+        name: category.name,
+        displayOrder: category.displayOrder,
+        active: true,
+        audiences: category.audiences,
+      });
+      setCategories((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setNotice(`${updated.name} was reactivated.`);
+    } catch (caught) {
+      setNotice(caught instanceof ApiRequestError ? caught.message : `${category.name} could not be reactivated.`);
+    }
+  }
+
   return (
     <main className="admin-content">
       <header className="admin-page-head"><div><p className="eyebrow">Store organisation</p><h1>Clothing Types</h1><p>Assign each clothing type to Women, Men, Kids, or any combination.</p></div></header>
@@ -92,9 +111,13 @@ export function CategoriesPage() {
             <label>Clothing type name<input value={category.name} onChange={(event) => setCategories((items) => items.map((item) => item.id === category.id ? { ...item, name: event.target.value } : item))} /></label>
             <label>Display order<input type="number" min="0" value={category.displayOrder} onChange={(event) => setCategories((items) => items.map((item) => item.id === category.id ? { ...item, displayOrder: Number(event.target.value) } : item))} /></label>
             <fieldset className="admin-checklist"><legend>Audiences</legend>{audienceOptions.map(({ value, label }) => <label key={value}><input type="checkbox" aria-label={`${label} for ${category.name}`} checked={category.audiences.includes(value)} onChange={() => toggleCategoryAudience(category.id, value)} />{label}</label>)}</fieldset>
-            <span className={`status status--${category.active ? "available" : "hidden"}`}>{category.active ? "active" : "retired"}</span>
-            <button type="button" aria-label={`Save ${category.name}`} onClick={() => save(category)}>Save</button>
-            {category.active ? <button className="danger-link" type="button" onClick={() => retire(category)}>Retire</button> : null}
+            <div className="category-list__actions">
+              <span className={`status status--${category.active ? "available" : "hidden"}`}>{category.active ? "active" : "retired"}</span>
+              <button type="button" aria-label={`Save ${category.name}`} onClick={() => save(category)}>Save</button>
+              {category.active
+                ? <button className="danger-link" type="button" aria-label={`Retire ${category.name}`} onClick={() => retire(category)}>Retire</button>
+                : <button type="button" aria-label={`Reactivate ${category.name}`} onClick={() => reactivate(category)}>Reactivate</button>}
+            </div>
           </article>
         ))}
       </section>

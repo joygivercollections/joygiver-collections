@@ -47,3 +47,22 @@ it("lets the owner assign a clothing type to multiple audiences", async () => {
     expect.objectContaining({ body: expect.stringContaining('"audiences":["women","men"]') }),
   );
 });
+
+it("reactivates a retired clothing type without changing its details", async () => {
+  const category = { id: "maxi-skirts", name: "Maxi Skirts", slug: "maxi-skirts", active: false, displayOrder: 19, audiences: ["women"] };
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify([category]), { status: 200, headers: { "Content-Type": "application/json" } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ...category, active: true }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><CategoriesPage /></MemoryRouter>);
+  await user.click(await screen.findByRole("button", { name: /reactivate maxi skirts/i }));
+
+  expect(fetchMock).toHaveBeenLastCalledWith(
+    "/api/admin/categories/maxi-skirts",
+    expect.objectContaining({ body: JSON.stringify({ name: "Maxi Skirts", displayOrder: 19, active: true, audiences: ["women"] }) }),
+  );
+  expect(await screen.findByText(/maxi skirts was reactivated/i)).toBeVisible();
+  expect(screen.getByRole("button", { name: /retire maxi skirts/i })).toBeVisible();
+});
