@@ -1,15 +1,18 @@
 # Joygiver Collections
 
-A mobile-first catalogue and owner dashboard for Joygiver Collections in Abuja. Customers can browse New and Thrifted collections, filter the catalogue, use a guest cart, select only the cart lines they want, and send one pre-filled WhatsApp order. The application runs as a React frontend and Cloudflare Worker backed by D1 and R2.
+A mobile-first family fashion catalogue and owner dashboard for Joygiver Collections in Abuja. Customers can browse New and Thrifted clothing for Women, Men, and Kids, explore wholesale packages, use a guest cart, select only the cart lines they want, receive complete-group promotion discounts, and send one pre-filled WhatsApp order. The application runs as a React frontend and Cloudflare Worker backed by D1 and R2.
 
 ## What is included
 
 - Mixed latest arrivals on the home page, with explicit **New** and **Thrifted** labels.
-- Dedicated New and Thrifted catalogues with search, category, size, price, and sort filters.
+- Dedicated New and Thrifted catalogues for Women, Men, and Kids, with audience-specific clothing types and filters.
+- Unisex labels without a separate public Unisex catalogue.
+- Wholesale packages described by package image, clothing types, piece count, price, audience, and condition.
+- Scheduled complete-group promotions that discount only full quantity multiples.
 - Guest cart stored in the browser—no customer account required.
 - Selective checkout: only checked cart items appear in the WhatsApp order.
 - Server-side price, stock, size, and availability validation immediately before ordering.
-- Owner email/password login with product, category, image, inventory-state, and password management.
+- Owner email/password login with retail, wholesale, promotion, clothing-type, brand-asset, inventory-state, and password management.
 - Sold items remain visibly sold for 48 hours, then disappear from the public catalogue while staying in the owner dashboard.
 - D1 product data, R2 product images, same-origin mutation protection, secure sessions, and login throttling.
 
@@ -62,7 +65,7 @@ These commands modify the selected Cloudflare account. Confirm the active accoun
    npm run deploy
    ```
 
-6. The Wrangler route declares `joygivercollections.com` as a custom domain. The domain must be active in the same Cloudflare account. Configure the registrar to use the Cloudflare nameservers if it is not already on Cloudflare. Confirm the deployment in the Cloudflare dashboard before changing live DNS.
+6. The permanent staging URL is `https://joygiver-collections.joygivercollections.workers.dev`. The Wrangler route also declares `joygivercollections.com` as a custom domain; it can be added later, after the domain is active in the same Cloudflare account. Confirm the staging deployment before changing live DNS.
 
 ## One-time owner creation
 
@@ -94,24 +97,69 @@ The owner signs in at `/owner/login`.
 - **Hide without deleting:** Products → Hide. Hidden products disappear publicly but remain editable in the dashboard.
 - **Delete permanently:** Products → Delete, then type the exact product reference. This permanently removes the record and R2 images.
 - **Manage filters:** Categories lets the owner add, rename, reorder, or retire categories. A category with products cannot be retired until those products are reassigned.
+- **Manage wholesale:** Wholesale lets the owner publish a package photo and its audience, condition, clothing types, piece count, stock, and package price without exposing every garment inside.
+- **Schedule promotions:** Promotions lets the owner choose eligible retail items and wholesale packages, set the required complete-group quantity, percentage discount, and start/end time. A second discount group applies only at the next exact multiple.
+- **Update the storefront:** Site Settings lets the owner replace the logo and family hero image and edit the hero heading/copy without a code deployment.
 - **Change password:** Account → Change password. The current password is required, and all other sessions are revoked.
 
-## Brand files and social links
+## Brand assets and social links
 
-The storefront logo and hero artwork are deliberately file-based so they can be replaced without changing page components. Overwrite `public/brand/logo.svg` and `public/brand/hero-art.svg` while keeping those filenames, or change their paths in `app/config.ts`. The home collection-panel photos are `public/brand/new-edit.png` and `public/brand/thrifted-edit.png`.
+The storefront loads the logo, family hero image, and hero copy from owner-managed Site Settings. `public/brand/joygiver-logo.jpeg` and `public/brand/family-hero.png` are safe fallback assets when settings cannot load. The home collection-panel photos are `public/brand/new-edit.png` and `public/brand/thrifted-edit.png`.
 
 Add the store's Facebook, Instagram, and TikTok profile URLs in `app/config.ts`. Until real URLs are added, those icons remain visible but inactive. WhatsApp uses `VITE_WHATSAPP_NUMBER`.
+
+## Staging release order
+
+Use this order for the family-commerce release. The database migration is additive, but the new Worker expects it to exist.
+
+1. Export remote D1 to a protected path outside this repository:
+
+   ```powershell
+   npx wrangler d1 export joygiver-store --remote --output <PROTECTED_BACKUP_PATH>
+   ```
+
+2. Confirm `npx wrangler whoami` shows the Joygiver Cloudflare account.
+3. Apply `0002_family_catalogue_promotions_wholesale.sql` remotely before deploying the new code:
+
+   ```powershell
+   npm run db:migrate:remote
+   ```
+
+4. Run the full local verification gate:
+
+   ```powershell
+   npm test
+   npm run typecheck
+   npm run build
+   npm audit
+   ```
+
+5. Deploy to the existing Workers staging URL:
+
+   ```powershell
+   npx wrangler deploy
+   ```
+
+6. Run the read-only smoke checks:
+
+   ```powershell
+   $env:SMOKE_BASE_URL='https://joygiver-collections.joygivercollections.workers.dev'
+   npm run smoke
+   ```
+
+7. Manually verify owner login, one retail audience edit, one wholesale package draft, one paused promotion, logo and hero previews, selective cart checkout, and the final WhatsApp text.
+8. Enter the real catalogue only after every verification above passes.
 
 ## Production verification
 
 Run the read-only smoke check after every deployment:
 
 ```powershell
-$env:SMOKE_BASE_URL='https://joygivercollections.com'
+$env:SMOKE_BASE_URL='https://joygiver-collections.joygivercollections.workers.dev'
 npm run smoke
 ```
 
-Then manually test owner login, one image upload, publication, cart persistence after refresh, selecting one line from a two-line cart, WhatsApp message contents, and marking/restoring a test item.
+The smoke script is read-only. It validates health, configuration, settings, audience categories, retail, wholesale, promotion, guest protection, response shapes, and security headers without creating or changing store data.
 
 ## Backup, migration, and secret rotation
 
@@ -126,3 +174,9 @@ Schema updates belong in a new numbered file under `migrations/`; never edit a m
 R2 images should be covered by an account-level backup or object replication policy appropriate to the store. Periodically test restoring both database metadata and its referenced image objects.
 
 Rotate a Worker secret by running `npx wrangler secret put <SECRET_NAME>` and supplying the replacement through the secure prompt. Changing the owner password from the dashboard revokes other owner sessions.
+
+## Rollback safety
+
+If the staging deployment fails, roll the Worker code back to the previous Cloudflare deployment while leaving the additive `0002` tables and columns in place. Do not drop the `0002` schema in production: the earlier Worker can continue while the additive data remains.
+
+Restore D1 from the pre-release export only when data corruption is confirmed, not merely because code rollback is needed. Preserve every R2 object referenced by either the previous or current deployment until the rollback has been verified end to end, including owner login, catalogue reads, cart validation, and image delivery.
