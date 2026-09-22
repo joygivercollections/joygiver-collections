@@ -161,6 +161,10 @@
 .catalogue__header { max-width: 720px; padding-bottom: 44px; }
 .catalogue__header h1 { margin-bottom: 20px; font-size: clamp(3rem, 8vw, 6rem); }
 .catalogue__header > p:last-child { max-width: 610px; color: var(--muted); }
+.audience-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 30px; border: 1px solid var(--border); background: white; }
+.audience-tabs a { min-width: 0; min-height: 48px; display: grid; place-items: center; border-right: 1px solid var(--border); padding: 0 8px; font-size: .68rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.audience-tabs a:last-child { border-right: 0; }
+.audience-tabs a[aria-current="page"] { background: var(--charcoal); color: white; }
 .search-summary { margin: -20px 0 28px; padding: 14px 16px; background: var(--ivory); font-size: .85rem; }
 .catalogue__toolbar { min-height: 61px; display: flex; align-items: center; justify-content: space-between; border-block: 1px solid var(--border); margin-bottom: 30px; }
 .catalogue__toolbar > p { margin: 0; color: var(--muted); font-size: .72rem; }
