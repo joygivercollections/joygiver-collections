@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { AdminProduct, AdminPromotion, AdminWholesalePackage } from "../../shared/contracts";
 import { promotionInputSchema, type PromotionInput } from "../../shared/validation";
 import { ApiRequestError, ownerApi } from "../api";
+import { Pagination } from "../components/Pagination";
 
 export function watLocalToUtc(value: string): string {
   const normalized = value.length === 16 ? `${value}:00` : value;
@@ -29,15 +30,47 @@ export function PromotionForm() {
   const [packageIds, setPackageIds] = useState<string[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [packageSearch, setPackageSearch] = useState("");
+  const [productPage, setProductPage] = useState(1);
+  const [packagePage, setPackagePage] = useState(1);
+  const [productTotal, setProductTotal] = useState(0);
+  const [packageTotal, setPackageTotal] = useState(0);
+  const [selectedProducts, setSelectedProducts] = useState<AdminProduct[]>([]);
+  const [selectedPackages, setSelectedPackages] = useState<AdminWholesalePackage[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([ownerApi.products({ limit: "50" }, controller.signal), ownerApi.wholesale({ limit: "50" }, controller.signal)])
-      .then(([retail, wholesale]) => { setProducts(retail.items); setPackages(wholesale.items); })
-      .catch(() => setErrors(["Eligible inventory could not be loaded."]));
-    if (id) ownerApi.promotion(id, controller.signal).then(fill).catch(() => setErrors(["Promotion could not be loaded."]));
+    const timeout = window.setTimeout(() => {
+      ownerApi.products({ limit: "20", page: String(productPage), search: productSearch.trim() || undefined }, controller.signal)
+        .then((result) => { setProducts(result.items); setProductTotal(result.total); })
+        .catch((caught) => { if (!(caught instanceof DOMException && caught.name === "AbortError")) setErrors(["Eligible retail inventory could not be loaded."]); });
+    }, 250);
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [productPage, productSearch]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      ownerApi.wholesale({ limit: "20", page: String(packagePage), search: packageSearch.trim() || undefined }, controller.signal)
+        .then((result) => { setPackages(result.items); setPackageTotal(result.total); })
+        .catch((caught) => { if (!(caught instanceof DOMException && caught.name === "AbortError")) setErrors(["Eligible wholesale inventory could not be loaded."]); });
+    }, 250);
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [packagePage, packageSearch]);
+
+  useEffect(() => {
+    if (!id) return;
+    const controller = new AbortController();
+    ownerApi.promotion(id, controller.signal).then(async (item) => {
+      fill(item);
+      const [retail, wholesale] = await Promise.all([
+        Promise.all(item.productIds.map((productId) => ownerApi.product(productId, controller.signal))),
+        Promise.all(item.wholesalePackageIds.map((packageId) => ownerApi.wholesalePackage(packageId, controller.signal))),
+      ]);
+      setSelectedProducts(retail);
+      setSelectedPackages(wholesale);
+    }).catch(() => setErrors(["Promotion could not be loaded."]));
     return () => controller.abort();
   }, [id]);
 
@@ -47,9 +80,16 @@ export function PromotionForm() {
   }
 
   const preview = `Every complete group of ${Number(requiredQuantity) || 0} eligible cart items receives ${Number(discountPercent) || 0}% off.`;
-  const filteredProducts = useMemo(() => products.filter((item) => `${item.name} ${item.reference}`.toLowerCase().includes(productSearch.toLowerCase())), [products, productSearch]);
-  const filteredPackages = useMemo(() => packages.filter((item) => `${item.name} ${item.reference}`.toLowerCase().includes(packageSearch.toLowerCase())), [packages, packageSearch]);
-  const toggle = (values: string[], setValues: (next: string[]) => void, value: string) => setValues(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  function toggleProduct(item: AdminProduct) {
+    const selected = productIds.includes(item.id);
+    setProductIds(selected ? productIds.filter((value) => value !== item.id) : [...productIds, item.id]);
+    setSelectedProducts((values) => selected ? values.filter((value) => value.id !== item.id) : values.some((value) => value.id === item.id) ? values : [...values, item]);
+  }
+  function togglePackage(item: AdminWholesalePackage) {
+    const selected = packageIds.includes(item.id);
+    setPackageIds(selected ? packageIds.filter((value) => value !== item.id) : [...packageIds, item.id]);
+    setSelectedPackages((values) => selected ? values.filter((value) => value.id !== item.id) : values.some((value) => value.id === item.id) ? values : [...values, item]);
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setErrors([]);
@@ -74,8 +114,8 @@ export function PromotionForm() {
       </div></section>
       <section className="form-card"><div className="form-card__heading"><span>02</span><div><h2>Schedule</h2><p>Africa/Lagos (WAT), UTC+1</p></div></div><div className="form-fields"><label className="field">Starts<input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} /></label><label className="field">Ends<input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} /></label><label className="field field--wide"><input type="checkbox" checked={paused} onChange={(event) => setPaused(event.target.checked)} /> Pause this promotion</label></div></section>
       <section className="form-card"><div className="form-card__heading"><span>03</span><div><h2>Eligible inventory</h2></div></div><div className="promotion-eligibility">
-        <div><label>Search retail products<input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} /></label>{filteredProducts.map((item) => <label key={item.id}><input type="checkbox" aria-label={item.name} checked={productIds.includes(item.id)} onChange={() => toggle(productIds, setProductIds, item.id)} />{item.name} <small>{item.reference}</small></label>)}</div>
-        <div><label>Search wholesale packages<input value={packageSearch} onChange={(event) => setPackageSearch(event.target.value)} /></label>{filteredPackages.map((item) => <label key={item.id}><input type="checkbox" aria-label={item.name} checked={packageIds.includes(item.id)} onChange={() => toggle(packageIds, setPackageIds, item.id)} />{item.name} <small>{item.reference}</small></label>)}</div>
+        <div><label>Search retail products<input value={productSearch} onChange={(event) => { setProductPage(1); setProductSearch(event.target.value); }} /></label><p>{selectedProducts.length} selected</p>{selectedProducts.map((item) => <button type="button" key={`selected-${item.id}`} onClick={() => toggleProduct(item)}>Remove {item.name}</button>)}{products.map((item) => <label key={item.id}><input type="checkbox" aria-label={item.name} checked={productIds.includes(item.id)} onChange={() => toggleProduct(item)} />{item.name} <small>{item.reference}</small></label>)}<Pagination page={productPage} pageSize={20} total={productTotal} label="retail products" onPageChange={setProductPage} /></div>
+        <div><label>Search wholesale packages<input value={packageSearch} onChange={(event) => { setPackagePage(1); setPackageSearch(event.target.value); }} /></label><p>{selectedPackages.length} selected</p>{selectedPackages.map((item) => <button type="button" key={`selected-${item.id}`} onClick={() => togglePackage(item)}>Remove {item.name}</button>)}{packages.map((item) => <label key={item.id}><input type="checkbox" aria-label={item.name} checked={packageIds.includes(item.id)} onChange={() => togglePackage(item)} />{item.name} <small>{item.reference}</small></label>)}<Pagination page={packagePage} pageSize={20} total={packageTotal} label="wholesale packages" onPageChange={setPackagePage} /></div>
       </div></section>
       <div className="product-form__actions"><Link className="button button--light" to="/owner/promotions">Cancel</Link><button className="button button--dark" type="submit" disabled={busy}>{busy ? "Saving…" : "Save promotion"}</button></div>
     </form>

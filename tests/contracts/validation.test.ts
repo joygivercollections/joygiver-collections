@@ -153,6 +153,18 @@ describe("cartValidationSchema", () => {
 
     expect(() => cartValidationSchema.parse({ items })).toThrow(/50/);
   });
+
+  it("rejects duplicate normalized retail and wholesale identities", () => {
+    const result = cartValidationSchema.safeParse({ items: [
+      { itemType: "retail", productId: " product-1 ", size: " M ", quantity: 1, lastKnownPriceKobo: 1000 },
+      { itemType: "retail", productId: "product-1", size: "M", quantity: 2, lastKnownPriceKobo: 1000 },
+      { itemType: "wholesale", packageId: "package-1", quantity: 1, lastKnownPriceKobo: 5000 },
+      { itemType: "wholesale", packageId: " package-1 ", quantity: 3, lastKnownPriceKobo: 5000 },
+    ] });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toContain("Duplicate cart items are not allowed");
+  });
 });
 
 describe("loginSchema", () => {

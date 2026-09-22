@@ -18,8 +18,13 @@ export function HomePage() {
   useEffect(() => {
     const controller = new AbortController();
     setError(false);
-    getProducts({ sort: "latest", limit: 8 }, controller.signal)
-      .then((result) => setProducts(result.items))
+    Promise.all((["new", "thrifted"] as const).flatMap((condition) => (["women", "men", "kids"] as const).map((audience) =>
+      getProducts({ sort: "latest", condition, audience, limit: 2 }, controller.signal),
+    )))
+      .then((results) => {
+        const unique = new Map(results.flatMap((result) => result.items).map((item) => [item.id, item]));
+        setProducts([...unique.values()].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt)).slice(0, 8));
+      })
       .catch((caught: unknown) => {
         if (!(caught instanceof DOMException && caught.name === "AbortError")) setError(true);
       });

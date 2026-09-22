@@ -105,9 +105,8 @@ export async function deleteRegisteredImage(db: D1Database, bucket: R2Bucket, ow
   const config = configFor(owner);
   const row = await db.prepare(`SELECT object_key FROM ${config.table} WHERE id = ? AND ${config.ownerColumn} = ?`).bind(imageId, owner.ownerId).first<{ object_key: string }>();
   if (!row) return false;
-  try { await bucket.delete(row.object_key); }
-  catch { throw new ImageStorageError("image_storage_unavailable", 503, "Image storage is temporarily unavailable"); }
   await db.prepare(`DELETE FROM ${config.table} WHERE id = ?`).bind(imageId).run();
+  await bucket.delete(row.object_key).catch(() => undefined);
   return true;
 }
 

@@ -47,3 +47,22 @@ it("pauses a promotion without changing its schedule", async () => {
   expect(fetchMock).toHaveBeenLastCalledWith("/api/admin/promotions/promo-1", expect.objectContaining({ body: expect.stringContaining('"startAt":"2026-09-21T10:00:00.000Z"') }));
   expect(String(fetchMock.mock.calls[1][1]?.body)).toContain('"paused":true');
 });
+
+it("searches the full eligible inventory through the server", async () => {
+  const fetchMock = vi.fn(async (input) => {
+    const url = String(input);
+    if (url.includes("/api/admin/products")) {
+      const items = url.includes("search=rare") ? [{ ...retail, id: "product-75", name: "Rare page seventy-five gown" }] : [];
+      return new Response(JSON.stringify({ items, page: 1, pageSize: 20, total: items.length ? 1 : 75 }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (url.includes("/api/admin/wholesale")) return new Response(JSON.stringify({ items: [], page: 1, pageSize: 20, total: 0 }), { status: 200, headers: { "Content-Type": "application/json" } });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+  render(<MemoryRouter><PromotionForm /></MemoryRouter>);
+
+  await user.type(screen.getByLabelText(/search retail products/i), "rare");
+  expect(await screen.findByLabelText(/rare page seventy-five gown/i)).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("search=rare"), expect.anything());
+});

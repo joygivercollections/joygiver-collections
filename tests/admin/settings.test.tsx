@@ -26,7 +26,7 @@ it("shows how many products block clothing type retirement", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><CategoriesPage /></MemoryRouter>);
   await user.click(await screen.findByRole("button", { name: /retire/i }));
-  expect(await screen.findByText(/3 products must be reassigned/i)).toBeVisible();
+  expect(await screen.findByText(/3 retail products must be reassigned/i)).toBeVisible();
 });
 
 it("lets the owner assign a clothing type to multiple audiences", async () => {

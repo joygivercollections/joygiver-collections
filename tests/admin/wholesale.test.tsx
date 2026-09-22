@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { expect, it, vi } from "vitest";
 import { WholesaleForm } from "../../app/admin/WholesaleForm";
 import { WholesalePage } from "../../app/admin/WholesalePage";
@@ -60,4 +60,44 @@ it("supports sold, restore, hide, and exact-reference deletion controls", async 
   await user.type(screen.getByLabelText(/type package reference/i), "JGC-W-1234ABCD");
   await user.click(screen.getByRole("button", { name: /delete permanently/i }));
   expect(fetchMock).toHaveBeenCalledWith("/api/admin/wholesale/wholesale-1", expect.objectContaining({ method: "DELETE", body: expect.stringContaining("JGC-W-1234ABCD") }));
+});
+
+it("loads later wholesale inventory pages", async () => {
+  const fetchMock = vi.fn(async (input) => {
+    const page = String(input).includes("page=2") ? 2 : 1;
+    return new Response(JSON.stringify({ items: [{ ...packageItem, id: `package-${page}`, name: `Wholesale page ${page}` }], page, pageSize: 24, total: 25 }), { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+  render(<MemoryRouter><WholesalePage /></MemoryRouter>);
+
+  expect(await screen.findByText("1–24 of 25 packages")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(await screen.findByText("Wholesale page 2")).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("page=2"), expect.anything());
+});
+
+it("removes and reorders representative package images", async () => {
+  const images = [
+    { id: "11111111-1111-4111-8111-111111111111", url: "/media/one.jpg", alt: "Front", displayOrder: 0 },
+    { id: "22222222-2222-4222-8222-222222222222", url: "/media/two.jpg", alt: "Back", displayOrder: 1 },
+  ];
+  const fetchMock = vi.fn(async (input, init) => {
+    const url = String(input);
+    if (url.includes("/api/admin/categories")) return new Response(JSON.stringify([{ id: "cat-jeans", name: "Jeans", slug: "jeans", active: true, displayOrder: 1, audiences: ["women", "men"] }]), { status: 200, headers: { "Content-Type": "application/json" } });
+    if (url.endsWith("/images/order") && init?.method === "PUT") return new Response(JSON.stringify({ images: [...images].reverse().map((image, index) => ({ ...image, displayOrder: index })) }), { status: 200, headers: { "Content-Type": "application/json" } });
+    if (url.includes("/images/") && init?.method === "DELETE") return new Response(null, { status: 204 });
+    if (url.endsWith("/api/admin/wholesale/wholesale-1")) return new Response(JSON.stringify({ ...packageItem, images, primaryImage: images[0] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/owner/wholesale/wholesale-1"]}><Routes><Route path="/owner/wholesale/:id" element={<WholesaleForm />} /></Routes></MemoryRouter>);
+
+  await user.click((await screen.findAllByRole("button", { name: /move later/i }))[0]);
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/images/order"), expect.objectContaining({ method: "PUT", body: expect.stringContaining(images[1].id) }));
+  await user.click(screen.getAllByRole("button", { name: /remove image/i })[0]);
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/images/"), expect.objectContaining({ method: "DELETE" }));
+  expect(await screen.findByText(/image removed/i)).toBeVisible();
 });

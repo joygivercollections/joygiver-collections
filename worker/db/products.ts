@@ -642,6 +642,7 @@ export async function listAdminProducts(
     condition?: "new" | "thrifted";
     audience?: Audience;
     category?: string;
+    promoEligible?: boolean;
     page?: number;
     limit?: number;
   } = {},
@@ -671,6 +672,18 @@ export async function listAdminProducts(
   if (options.category) {
     clauses.push("c.slug = ?");
     values.push(options.category);
+  }
+  if (options.promoEligible !== undefined) {
+    clauses.push(`${options.promoEligible ? "" : "NOT "}EXISTS (
+      SELECT 1 FROM promotion_products pp
+      INNER JOIN promotions active_promotion ON active_promotion.id = pp.promotion_id
+      WHERE pp.product_id = p.id
+        AND active_promotion.paused = 0
+        AND active_promotion.start_at <= ?
+        AND active_promotion.end_at > ?
+    )`);
+    const timestamp = new Date().toISOString();
+    values.push(timestamp, timestamp);
   }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const page = options.page ?? 1;

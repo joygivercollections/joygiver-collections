@@ -31,6 +31,10 @@ describe("guest cart storage", () => {
     expect(loadCart()).toEqual([]);
     localStorage.setItem("joygiver-cart", JSON.stringify({ version: 2, lines: [{ itemType: "wholesale", packageId: 5 }] }));
     expect(loadCart()).toEqual([]);
+    localStorage.setItem("joygiver-cart", JSON.stringify({ version: 2, lines: [{ ...lineA, itemType: "giftcard" }] }));
+    expect(loadCart()).toEqual([]);
+    localStorage.setItem("joygiver-cart", JSON.stringify({ version: 2, lines: [{ ...lineA, itemType: "retail", lastKnownPriceKobo: 0 }] }));
+    expect(loadCart()).toEqual([]);
   });
 
   it("merges the same product and size and caps thrifted quantities at one", () => {

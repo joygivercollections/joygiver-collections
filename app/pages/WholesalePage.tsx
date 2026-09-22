@@ -2,10 +2,14 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Audience, CategorySummary, WholesaleConditionScope, WholesalePackageSummary } from "../../shared/contracts";
 import { getCategories, getWholesalePackages } from "../api";
 import { WholesaleCard } from "../components/WholesaleCard";
+import { Pagination } from "../components/Pagination";
 import { RouteError } from "../components/RouteError";
 
 export function WholesalePage() {
   const [items, setItems] = useState<WholesalePackageSummary[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24);
+  const [total, setTotal] = useState(0);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -31,9 +35,9 @@ export function WholesalePage() {
     availability: availability || undefined,
     search: query || undefined,
     sort,
-    page: 1,
+    page,
     limit: 24,
-  }), [audience, availability, category, condition, maxPieces, maxPrice, minPieces, minPrice, query, sort]);
+  }), [audience, availability, category, condition, maxPieces, maxPrice, minPieces, minPrice, page, query, sort]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,33 +48,33 @@ export function WholesalePage() {
   useEffect(() => {
     const controller = new AbortController();
     setError(false);
-    getWholesalePackages(filters, controller.signal).then((result) => setItems(result.items)).catch((caught: unknown) => {
+    getWholesalePackages(filters, controller.signal).then((result) => { setItems(result.items); setPageSize(result.pageSize); setTotal(result.total); }).catch((caught: unknown) => {
       if (!(caught instanceof DOMException && caught.name === "AbortError")) setError(true);
     });
     return () => controller.abort();
   }, [filters, retry]);
 
-  function submit(event: FormEvent) { event.preventDefault(); setQuery(search.trim()); }
+  function submit(event: FormEvent) { event.preventDefault(); setPage(1); setQuery(search.trim()); }
 
   return (
     <main className="wholesale-page page-width">
       <header className="catalogue__header"><p className="eyebrow">Buy in quantity</p><h1>Wholesale Packages</h1><p>See the package photo, clothing types, piece count, and total price—without browsing every garment inside.</p></header>
       <form className="wholesale-filters" role="search" onSubmit={submit}>
         <label>Search packages<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-        <label>Audience<select value={audience} onChange={(event) => setAudience(event.target.value as Audience | "")}><option value="">All audiences</option><option value="women">Women</option><option value="men">Men</option><option value="kids">Kids</option></select></label>
-        <label>Condition<select value={condition} onChange={(event) => setCondition(event.target.value as WholesaleConditionScope | "")}><option value="">All conditions</option><option value="new">New</option><option value="thrifted">Thrifted</option><option value="mixed">Mixed</option></select></label>
-        <label>Clothing type<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">All types</option>{categories.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
-        <label>Minimum pieces<input type="number" min="1" value={minPieces} onChange={(event) => setMinPieces(event.target.value)} /></label>
-        <label>Maximum pieces<input type="number" min="1" value={maxPieces} onChange={(event) => setMaxPieces(event.target.value)} /></label>
-        <label>Minimum price (₦)<input type="number" min="0" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label>
-        <label>Maximum price (₦)<input type="number" min="0" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
-        <label>Availability<select value={availability} onChange={(event) => setAvailability(event.target.value as "available" | "sold" | "")}><option value="">Available and recent sold</option><option value="available">Available</option><option value="sold">Sold</option></select></label>
-        <label>Sort<select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="latest">Latest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option></select></label>
+        <label>Audience<select value={audience} onChange={(event) => { setPage(1); setAudience(event.target.value as Audience | ""); }}><option value="">All audiences</option><option value="women">Women</option><option value="men">Men</option><option value="kids">Kids</option></select></label>
+        <label>Condition<select value={condition} onChange={(event) => { setPage(1); setCondition(event.target.value as WholesaleConditionScope | ""); }}><option value="">All conditions</option><option value="new">New</option><option value="thrifted">Thrifted</option><option value="mixed">Mixed</option></select></label>
+        <label>Clothing type<select value={category} onChange={(event) => { setPage(1); setCategory(event.target.value); }}><option value="">All types</option>{categories.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
+        <label>Minimum pieces<input type="number" min="1" value={minPieces} onChange={(event) => { setPage(1); setMinPieces(event.target.value); }} /></label>
+        <label>Maximum pieces<input type="number" min="1" value={maxPieces} onChange={(event) => { setPage(1); setMaxPieces(event.target.value); }} /></label>
+        <label>Minimum price (₦)<input type="number" min="0" value={minPrice} onChange={(event) => { setPage(1); setMinPrice(event.target.value); }} /></label>
+        <label>Maximum price (₦)<input type="number" min="0" value={maxPrice} onChange={(event) => { setPage(1); setMaxPrice(event.target.value); }} /></label>
+        <label>Availability<select value={availability} onChange={(event) => { setPage(1); setAvailability(event.target.value as "available" | "sold" | ""); }}><option value="">Available and recent sold</option><option value="available">Available</option><option value="sold">Sold</option></select></label>
+        <label>Sort<select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value as typeof sort); }}><option value="latest">Latest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option></select></label>
         <button className="button button--dark" type="submit">Search</button>
       </form>
       {error ? <RouteError onRetry={() => setRetry((value) => value + 1)} /> : null}
       {!items && !error ? <p>Loading wholesale packages…</p> : null}
-      {items ? <section className="wholesale-grid" aria-label="Wholesale packages">{items.map((item) => <WholesaleCard key={item.id} item={item} />)}{items.length === 0 ? <p>No wholesale packages match these filters.</p> : null}</section> : null}
+      {items ? <><section className="wholesale-grid" aria-label="Wholesale packages">{items.map((item) => <WholesaleCard key={item.id} item={item} />)}{items.length === 0 ? <p>No wholesale packages match these filters.</p> : null}</section><Pagination page={page} pageSize={pageSize} total={total} label="packages" onPageChange={setPage} /></> : null}
     </main>
   );
 }

@@ -30,7 +30,7 @@ export function ProductPage() {
   if (error && !product) return <div className="page-width product-route-error"><RouteError title="This piece is unavailable" message="It may have sold or moved out of the current collection." onRetry={() => setRetryKey((key) => key + 1)} /></div>;
   if (!product) return <div className="page-width product-detail product-detail--loading" aria-label="Loading product" />;
 
-  const sold = product.state === "sold";
+  const sold = product.state === "sold" || product.stockQuantity <= 0;
   return (
     <div className="product-detail page-width">
       <nav className="breadcrumbs" aria-label="Breadcrumb">

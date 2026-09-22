@@ -62,3 +62,26 @@ it("announces progress toward the next complete promotion group", async () => {
   render(<MemoryRouter><CartPage whatsAppNumber="2348030000000" /></MemoryRouter>);
   expect(await screen.findByText(/4 of 6 eligible items selected—add 2 more to unlock 15% off/i)).toBeVisible();
 });
+
+it("never enables checkout from an older validation after the selection changes", async () => {
+  let resolveFirst: ((response: Response) => void) | undefined;
+  let resolveSecond: ((response: Response) => void) | undefined;
+  const first = new Promise<Response>((resolve) => { resolveFirst = resolve; });
+  const second = new Promise<Response>((resolve) => { resolveSecond = resolve; });
+  vi.stubGlobal("fetch", vi.fn().mockImplementationOnce(() => first).mockImplementationOnce(() => second));
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><CartPage whatsAppNumber="2348030000000" /></MemoryRouter>);
+  await user.click(screen.getByLabelText(sold.name));
+  resolveFirst?.(new Response(JSON.stringify({
+    valid: [available, sold].map((line) => ({ ...line, canonicalPriceKobo: line.lastKnownPriceKobo, priceChanged: false })),
+    invalid: [], subtotalKobo: available.lastKnownPriceKobo + sold.lastKnownPriceKobo,
+  }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+  await waitFor(() => expect(screen.queryByRole("link", { name: /order/i })).not.toBeInTheDocument());
+  resolveSecond?.(new Response(JSON.stringify({
+    valid: [{ ...available, canonicalPriceKobo: available.lastKnownPriceKobo, priceChanged: false }],
+    invalid: [], subtotalKobo: available.lastKnownPriceKobo,
+  }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  expect(await screen.findByRole("link", { name: /order 1 selected item/i })).toBeVisible();
+});

@@ -70,7 +70,9 @@ export function CategoriesPage() {
       setNotice(`${category.name} was retired.`);
     } catch (caught) {
       const productCount = caught instanceof ApiRequestError ? caught.productCount : undefined;
-      setNotice(productCount ? `${productCount} products must be reassigned before ${category.name} can be retired.` : `Products must be reassigned before ${category.name} can be retired.`);
+      const wholesaleCount = caught instanceof ApiRequestError ? caught.wholesaleCount : undefined;
+      const dependencies = [productCount ? `${productCount} retail products` : "", wholesaleCount ? `${wholesaleCount} wholesale packages` : ""].filter(Boolean).join(" and ");
+      setNotice(dependencies ? `${dependencies} must be reassigned before ${category.name} can be retired.` : `Inventory must be reassigned before ${category.name} can be retired.`);
     }
   }
 

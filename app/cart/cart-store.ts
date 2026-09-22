@@ -18,18 +18,20 @@ function isCartLine(value: unknown): value is FamilyCartLine {
   const line = value as Partial<FamilyCartLine>;
   const identityIsValid = line.itemType === "wholesale"
     ? typeof (line as Partial<WholesaleCartLine>).packageId === "string"
-    : typeof (line as Partial<RetailCartLine>).productId === "string" && typeof (line as Partial<RetailCartLine>).size === "string";
+    : line.itemType === "retail" || line.itemType === undefined
+      ? typeof (line as Partial<RetailCartLine>).productId === "string" && typeof (line as Partial<RetailCartLine>).size === "string"
+      : false;
   return identityIsValid
     && typeof line.reference === "string"
     && typeof line.name === "string"
     && Number.isInteger(line.quantity) && (line.quantity ?? 0) > 0
-    && Number.isInteger(line.lastKnownPriceKobo) && (line.lastKnownPriceKobo ?? -1) >= 0
+    && Number.isInteger(line.lastKnownPriceKobo) && (line.lastKnownPriceKobo ?? 0) > 0
     && (line.imageUrl === null || typeof line.imageUrl === "string")
     && typeof line.selected === "boolean";
 }
 
 function isVersionTwoLine(value: unknown): value is FamilyCartLine {
-  return isCartLine(value) && (value as { itemType?: unknown }).itemType !== undefined;
+  return isCartLine(value) && ["retail", "wholesale"].includes(String((value as { itemType?: unknown }).itemType));
 }
 
 function isLegacyRetailLine(value: unknown): value is RetailCartLine {

@@ -48,3 +48,17 @@ it("reconciles package quantity and price while excluding unavailable lines", as
   expect(body.valid[0]).toMatchObject({ quantity: 2, priceChanged: true });
   expect(body.invalid.map((line) => line.reason).sort()).toEqual(["deleted", "hidden", "quantity_reduced"]);
 });
+
+it("rejects duplicate line identities before stock and promotion calculation", async () => {
+  const product = await createProduct({ stockQuantity: 3, priceKobo: 10_000 });
+  const pkg = await createWholesalePackage({ stockQuantity: 2, priceKobo: 20_000 });
+  const response = await apiRequest("/api/cart/validate", { method: "POST", body: JSON.stringify({ items: [
+    { itemType: "retail", productId: product.id, size: "M", quantity: 2, lastKnownPriceKobo: 10_000 },
+    { itemType: "retail", productId: product.id, size: "M", quantity: 2, lastKnownPriceKobo: 10_000 },
+    { itemType: "wholesale", packageId: pkg.id, quantity: 1, lastKnownPriceKobo: 20_000 },
+    { itemType: "wholesale", packageId: pkg.id, quantity: 2, lastKnownPriceKobo: 20_000 },
+  ] }) });
+
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toMatchObject({ code: "invalid_cart" });
+});

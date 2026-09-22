@@ -114,8 +114,11 @@ export async function createCategory(
 }
 
 export class CategoryAudienceConflictError extends Error {
-  constructor(public readonly productCount: number) {
-    super("Products must be reassigned before removing this audience");
+  constructor(
+    public readonly productCount: number,
+    public readonly wholesaleCount: number,
+  ) {
+    super("Retail products and wholesale packages must be reassigned before removing this audience");
     this.name = "CategoryAudienceConflictError";
   }
 }
@@ -152,7 +155,18 @@ export async function updateCategory(
         .bind(id, ...removed)
         .first<number>("total")) ?? 0,
     );
-    if (productCount > 0) throw new CategoryAudienceConflictError(productCount);
+    const wholesaleCount = Number(
+      (await db
+        .prepare(
+          `SELECT COUNT(DISTINCT wc.package_id) AS total
+           FROM wholesale_package_categories wc
+           INNER JOIN wholesale_package_audiences wa ON wa.package_id = wc.package_id
+           WHERE wc.category_id = ? AND wa.audience IN (${placeholders})`,
+        )
+        .bind(id, ...removed)
+        .first<number>("total")) ?? 0,
+    );
+    if (productCount > 0 || wholesaleCount > 0) throw new CategoryAudienceConflictError(productCount, wholesaleCount);
   }
   const slug = await uniqueCategorySlug(db, input.name, id);
   await db.batch([
@@ -191,23 +205,28 @@ export async function retireCategory(
   db: D1Database,
   id: string,
   now = new Date(),
-): Promise<{ retired: boolean; productCount: number; found: boolean }> {
+): Promise<{ retired: boolean; productCount: number; wholesaleCount: number; found: boolean }> {
   const category = await db
     .prepare("SELECT id FROM categories WHERE id = ?")
     .bind(id)
     .first<{ id: string }>();
-  if (!category) return { retired: false, productCount: 0, found: false };
+  if (!category) return { retired: false, productCount: 0, wholesaleCount: 0, found: false };
   const productCount =
     (await db
       .prepare("SELECT COUNT(*) AS total FROM products WHERE category_id = ?")
       .bind(id)
       .first<number>("total")) ?? 0;
-  if (productCount > 0) return { retired: false, productCount, found: true };
+  const wholesaleCount =
+    (await db
+      .prepare("SELECT COUNT(DISTINCT package_id) AS total FROM wholesale_package_categories WHERE category_id = ?")
+      .bind(id)
+      .first<number>("total")) ?? 0;
+  if (productCount > 0 || wholesaleCount > 0) return { retired: false, productCount, wholesaleCount, found: true };
   await db
     .prepare("UPDATE categories SET active = 0, updated_at = ? WHERE id = ?")
     .bind(now.toISOString(), id)
     .run();
-  return { retired: true, productCount: 0, found: true };
+  return { retired: true, productCount: 0, wholesaleCount: 0, found: true };
 }
 
 export async function listActiveCategories(

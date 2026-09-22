@@ -25,14 +25,16 @@ export class ApiRequestError extends Error implements ApiError {
   readonly code: string;
   readonly fieldErrors?: Record<string, string[]>;
   readonly productCount?: number;
+  readonly wholesaleCount?: number;
 
-  constructor(error: ApiError & { productCount?: number }) {
+  constructor(error: ApiError & { productCount?: number; wholesaleCount?: number }) {
     super(error.message);
     this.name = "ApiRequestError";
     this.status = error.status;
     this.code = error.code;
     this.fieldErrors = error.fieldErrors;
     this.productCount = error.productCount;
+    this.wholesaleCount = error.wholesaleCount;
   }
 }
 
@@ -44,7 +46,7 @@ async function requestJson<T>(path: string, signal?: AbortSignal, init?: Request
   });
 
   if (!response.ok) {
-    let body: Partial<ApiError> & { productCount?: number } = {};
+    let body: Partial<ApiError> & { productCount?: number; wholesaleCount?: number } = {};
     try {
       body = (await response.json()) as Partial<ApiError>;
     } catch {
@@ -56,6 +58,7 @@ async function requestJson<T>(path: string, signal?: AbortSignal, init?: Request
       message: body.message ?? "We could not complete that request. Please try again.",
       fieldErrors: body.fieldErrors,
       productCount: body.productCount,
+      wholesaleCount: body.wholesaleCount,
     });
   }
 

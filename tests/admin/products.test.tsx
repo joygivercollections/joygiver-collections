@@ -20,3 +20,19 @@ it("requires the exact reference before deleting a product", async () => {
   await user.type(screen.getByLabelText(/type product reference/i), "JGC-A1B2C3D4");
   expect(screen.getByRole("button", { name: /delete permanently/i })).toBeEnabled();
 });
+
+it("loads later inventory pages and reports the displayed range", async () => {
+  const fetchMock = vi.fn(async (input) => {
+    const page = String(input).includes("page=2") ? 2 : 1;
+    return new Response(JSON.stringify({ items: [{ ...product, id: `p${page}`, name: `Product page ${page}` }], page, pageSize: 24, total: 25 }), { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+  render(<MemoryRouter><ProductsPage /></MemoryRouter>);
+
+  expect(await screen.findByText("1–24 of 25 products")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(await screen.findByText("Product page 2")).toBeVisible();
+  expect(screen.getByText("25–25 of 25 products")).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("page=2"), expect.anything());
+});

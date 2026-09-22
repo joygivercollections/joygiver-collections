@@ -69,6 +69,7 @@ const adminListSchema = z.object({
   condition: z.enum(["new", "thrifted"]).optional(),
   audience: audienceSchema.optional(),
   category: z.string().trim().max(120).optional(),
+  promoEligible: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(24),
 });
@@ -89,6 +90,7 @@ const wholesaleListSchema = z.object({
   condition: z.enum(["new", "thrifted", "mixed"]).optional(),
   audience: audienceSchema.optional(),
   category: z.string().trim().max(120).optional(),
+  promoEligible: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(24),
 });
@@ -268,17 +270,10 @@ adminRoutes.delete("/products/:id", async (context) => {
   )
     .bind(product.id)
     .all<{ object_key: string }>();
-  try {
-    if (keys.results.length) {
-      await context.env.PRODUCT_IMAGES.delete(keys.results.map((row) => row.object_key));
-    }
-  } catch {
-    return context.json(
-      { status: 503, code: "image_storage_unavailable", message: "Images could not be removed; try again" },
-      503,
-    );
-  }
   await deleteAdminProduct(context.env.DB, product.id);
+  if (keys.results.length) {
+    await context.env.PRODUCT_IMAGES.delete(keys.results.map((row) => row.object_key)).catch(() => undefined);
+  }
   return context.body(null, 204);
 });
 
@@ -417,9 +412,8 @@ adminRoutes.delete("/wholesale/:id", async (context) => {
   const parsed = deleteSchema.safeParse(await readJson(context.req.raw));
   if (!parsed.success || parsed.data.confirmReference !== item.reference) return context.json({ status: 409, code: "reference_confirmation_required", message: "Type the exact wholesale reference to delete it" }, 409);
   const keys = await context.env.DB.prepare("SELECT object_key FROM wholesale_package_images WHERE package_id = ?").bind(item.id).all<{ object_key: string }>();
-  try { if (keys.results.length) await context.env.PRODUCT_IMAGES.delete(keys.results.map((row) => row.object_key)); }
-  catch { return context.json({ status: 503, code: "image_storage_unavailable", message: "Images could not be removed; try again" }, 503); }
   await deleteAdminWholesalePackage(context.env.DB, item.id);
+  if (keys.results.length) await context.env.PRODUCT_IMAGES.delete(keys.results.map((row) => row.object_key)).catch(() => undefined);
   return context.body(null, 204);
 });
 
@@ -576,6 +570,7 @@ adminRoutes.put("/categories/:id", async (context) => {
           code: "clothing_type_audience_conflict",
           message: error.message,
           productCount: error.productCount,
+          wholesaleCount: error.wholesaleCount,
         },
         409,
       );
@@ -603,8 +598,9 @@ adminRoutes.delete("/categories/:id", async (context) => {
       {
         status: 409,
         code: "category_in_use",
-        message: "Reassign products before retiring this category",
+        message: "Reassign retail products and wholesale packages before retiring this category",
         productCount: result.productCount,
+        wholesaleCount: result.wholesaleCount,
       },
       409,
     );

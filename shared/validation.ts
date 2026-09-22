@@ -116,7 +116,23 @@ export const cartValidationSchema = z.object({
   items: z
     .array(z.union([wholesaleCartValidationLineSchema, retailCartValidationLineSchema]))
     .min(1, "Select at least one item")
-    .max(50, "A maximum of 50 items can be checked at once"),
+    .max(50, "A maximum of 50 items can be checked at once")
+    .superRefine((items, context) => {
+      const identities = new Set<string>();
+      for (const [index, item] of items.entries()) {
+        const identity = item.itemType === "wholesale"
+          ? `wholesale:${item.packageId}`
+          : `retail:${item.productId}:${item.size}`;
+        if (identities.has(identity)) {
+          context.addIssue({
+            code: "custom",
+            path: [index],
+            message: "Duplicate cart items are not allowed",
+          });
+        }
+        identities.add(identity);
+      }
+    }),
 });
 
 export const loginSchema = z.object({

@@ -20,7 +20,7 @@ export function WholesaleDetailPage() {
 
   if (error) return <div className="page-width"><RouteError title="Package unavailable" /></div>;
   if (!item) return <div className="page-width product-detail--loading" aria-label="Loading wholesale package" />;
-  const sold = item.state === "sold";
+  const sold = item.state === "sold" || item.stockQuantity <= 0;
   const resolvedQuantity = Math.max(1, Math.min(item.stockQuantity, Number(quantity) || 1));
   const audience = item.audiences.map((value) => value === "kids" ? "Kids" : `${value[0].toUpperCase()}${value.slice(1)}`).join(" and ");
 

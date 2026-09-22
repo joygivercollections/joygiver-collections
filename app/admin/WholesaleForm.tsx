@@ -23,6 +23,7 @@ export function WholesaleForm() {
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [imageNotice, setImageNotice] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -39,6 +40,32 @@ export function WholesaleForm() {
 
   function toggleAudience(value: Audience) { setAudiences((items) => items.includes(value) ? items.filter((item) => item !== value) : [...items, value]); }
   function toggleCategory(value: string) { setCategoryIds((items) => items.includes(value) ? items.filter((item) => item !== value) : [...items, value]); }
+
+  async function removeImage(image: ProductImage) {
+    if (!id || !window.confirm(`Remove this image from ${name || "the package"}?`)) return;
+    try {
+      await ownerApi.deleteWholesaleImage(id, image.id);
+      setImages((items) => items.filter((item) => item.id !== image.id));
+      setImageNotice("Image removed.");
+    } catch (caught) {
+      setErrors([caught instanceof ApiRequestError ? caught.message : "The image could not be removed."]);
+    }
+  }
+
+  async function moveImage(index: number, direction: -1 | 1) {
+    if (!id) return;
+    const destination = index + direction;
+    if (destination < 0 || destination >= images.length) return;
+    const reordered = [...images];
+    [reordered[index], reordered[destination]] = [reordered[destination], reordered[index]];
+    try {
+      const result = await ownerApi.reorderWholesaleImages(id, reordered.map((image) => image.id));
+      setImages(result.images);
+      setImageNotice("Image order updated.");
+    } catch (caught) {
+      setErrors([caught instanceof ApiRequestError ? caught.message : "The image order could not be updated."]);
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -82,7 +109,8 @@ export function WholesaleForm() {
           <fieldset className="field field--wide admin-size-field"><legend>Clothing types inside</legend><div>{categories.map((category) => <label key={category.id}><input type="checkbox" aria-label={category.name} checked={categoryIds.includes(category.id)} onChange={() => toggleCategory(category.id)} /><span>{category.name}</span></label>)}</div></fieldset>
         </div></section>
         <section className="form-card"><div className="form-card__heading"><span>02</span><div><h2>Representative images</h2><p>Show what the package looks like without listing every garment.</p></div></div>
-          {images.length ? <div className="existing-images">{images.map((image) => <img key={image.id} src={image.url} alt={image.alt} />)}</div> : null}
+          {imageNotice ? <p className="admin-notice" role="status">{imageNotice}</p> : null}
+          {images.length ? <div className="existing-images">{images.map((image, index) => <figure key={image.id}><img src={image.url} alt={image.alt} /><figcaption><button type="button" disabled={index === 0} onClick={() => moveImage(index, -1)}>Move earlier</button><button type="button" disabled={index === images.length - 1} onClick={() => moveImage(index, 1)}>Move later</button><button className="danger-link" type="button" onClick={() => removeImage(image)}>Remove image</button></figcaption></figure>)}</div> : null}
           <label className="image-upload">Package images<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []).slice(0, 6))} /><span><strong>Choose images</strong></span></label>
         </section>
         <section className="form-card"><div className="form-card__heading"><span>03</span><div><h2>Store visibility</h2></div></div><div className="toggle-fields"><label><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /><span><strong>Published</strong></span></label><label><input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} /><span><strong>Featured package</strong></span></label></div></section>

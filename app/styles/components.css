@@ -569,3 +569,35 @@
   .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 54px 22px; }
   .latest-section { padding-block: 110px; }
 }
+.pagination {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2rem;
+  padding-top: 1rem;
+}
+
+.pagination p,
+.pagination span {
+  margin: 0;
+}
+
+.pagination div {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+}
+
+.pagination button {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.65rem 0.9rem;
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}

@@ -97,6 +97,13 @@ async function ensureNoOverlap(db: D1Database, input: PromotionInput, excludeId?
   if (row) throw new PromotionScheduleOverlapError();
 }
 
+function rethrowScheduleConstraint(error: unknown): never {
+  if (error instanceof Error && /PROMOTION_SCHEDULE_OVERLAP/i.test(error.message)) {
+    throw new PromotionScheduleOverlapError();
+  }
+  throw error;
+}
+
 function eligibilityStatements(db: D1Database, id: string, input: PromotionInput) {
   return [
     db.prepare("DELETE FROM promotion_products WHERE promotion_id = ?").bind(id),
@@ -110,12 +117,16 @@ export async function createAdminPromotion(db: D1Database, input: PromotionInput
   await ensureNoOverlap(db, input);
   const id = crypto.randomUUID();
   const timestamp = now.toISOString();
-  await db.batch([
-    db.prepare(`INSERT INTO promotions (id, name, description, required_quantity, discount_basis_points, start_at, end_at, paused, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(id, input.name, input.description, input.requiredQuantity, input.discountBasisPoints, new Date(input.startAt).toISOString(), new Date(input.endAt).toISOString(), input.paused ? 1 : 0, timestamp, timestamp),
-    ...eligibilityStatements(db, id, input).slice(2),
-  ]);
+  try {
+    await db.batch([
+      db.prepare(`INSERT INTO promotions (id, name, description, required_quantity, discount_basis_points, start_at, end_at, paused, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(id, input.name, input.description, input.requiredQuantity, input.discountBasisPoints, new Date(input.startAt).toISOString(), new Date(input.endAt).toISOString(), input.paused ? 1 : 0, timestamp, timestamp),
+      ...eligibilityStatements(db, id, input).slice(2),
+    ]);
+  } catch (error) {
+    rethrowScheduleConstraint(error);
+  }
   const created = await getAdminPromotion(db, id);
   if (!created) throw new Error("Created promotion could not be read");
   return created;
@@ -124,11 +135,15 @@ export async function createAdminPromotion(db: D1Database, input: PromotionInput
 export async function updateAdminPromotion(db: D1Database, id: string, input: PromotionInput, now = new Date()): Promise<AdminPromotion | null> {
   if (!await getAdminPromotion(db, id)) return null;
   await ensureNoOverlap(db, input, id);
-  await db.batch([
-    db.prepare(`UPDATE promotions SET name = ?, description = ?, required_quantity = ?, discount_basis_points = ?, start_at = ?, end_at = ?, paused = ?, updated_at = ? WHERE id = ?`)
-      .bind(input.name, input.description, input.requiredQuantity, input.discountBasisPoints, new Date(input.startAt).toISOString(), new Date(input.endAt).toISOString(), input.paused ? 1 : 0, now.toISOString(), id),
-    ...eligibilityStatements(db, id, input),
-  ]);
+  try {
+    await db.batch([
+      db.prepare(`UPDATE promotions SET name = ?, description = ?, required_quantity = ?, discount_basis_points = ?, start_at = ?, end_at = ?, paused = ?, updated_at = ? WHERE id = ?`)
+        .bind(input.name, input.description, input.requiredQuantity, input.discountBasisPoints, new Date(input.startAt).toISOString(), new Date(input.endAt).toISOString(), input.paused ? 1 : 0, now.toISOString(), id),
+      ...eligibilityStatements(db, id, input),
+    ]);
+  } catch (error) {
+    rethrowScheduleConstraint(error);
+  }
   return getAdminPromotion(db, id);
 }
 

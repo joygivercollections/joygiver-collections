@@ -28,6 +28,7 @@ beforeEach(() => {
 });
 
 it("shows package metadata without individual garment controls", async () => {
+  const user = userEvent.setup();
   render(<MemoryRouter><WholesalePage /></MemoryRouter>);
   const card = await screen.findByRole("article");
   expect(card).toHaveTextContent("Women and Men");
@@ -39,6 +40,8 @@ it("shows package metadata without individual garment controls", async () => {
   expect(card).not.toHaveTextContent(/size/i);
   expect(screen.getByRole("combobox", { name: /audience/i })).toBeVisible();
   expect(screen.getByRole("spinbutton", { name: /minimum pieces/i })).toBeVisible();
+  await user.click(screen.getByRole("button", { name: /add package to bag/i }));
+  expect(loadCart()).toEqual([expect.objectContaining({ itemType: "wholesale", packageId: "wholesale-1", quantity: 1 })]);
 });
 
 it("adds quantity two as one selected wholesale cart line", async () => {
@@ -50,4 +53,24 @@ it("adds quantity two as one selected wholesale cart line", async () => {
   await user.click(screen.getByRole("button", { name: /add 2 packages to bag/i }));
 
   expect(loadCart()).toEqual([expect.objectContaining({ itemType: "wholesale", packageId: "wholesale-1", quantity: 2, selected: true })]);
+});
+
+it("loads wholesale packages beyond the first page", async () => {
+  const fetchMock = vi.fn(async (input) => {
+    const url = String(input);
+    if (url.includes("/api/categories")) return new Response(JSON.stringify(packageItem.categories), { status: 200, headers: { "Content-Type": "application/json" } });
+    if (url.includes("/api/wholesale")) {
+      const page = url.includes("page=2") ? 2 : 1;
+      return new Response(JSON.stringify({ items: [{ ...packageItem, id: `package-${page}`, name: `Package page ${page}` }], page, pageSize: 24, total: 25 }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+  render(<MemoryRouter><WholesalePage /></MemoryRouter>);
+
+  expect(await screen.findByText("1–24 of 25 packages")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(await screen.findByRole("heading", { name: "Package page 2" })).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("page=2"), expect.anything());
 });

@@ -274,7 +274,7 @@ export async function deleteAdminWholesalePackage(db: D1Database, id: string) {
   return (result.meta.changes ?? 0) > 0;
 }
 
-export async function listAdminWholesalePackages(db: D1Database, filters: WholesaleFilters & { state?: "available" | "sold" | "hidden" } = {}): Promise<Paginated<AdminWholesalePackage>> {
+export async function listAdminWholesalePackages(db: D1Database, filters: WholesaleFilters & { state?: "available" | "sold" | "hidden"; promoEligible?: boolean } = {}): Promise<Paginated<AdminWholesalePackage>> {
   const clauses: string[] = [];
   const values: unknown[] = [];
   if (filters.audience) { clauses.push("EXISTS (SELECT 1 FROM wholesale_package_audiences wa WHERE wa.package_id = w.id AND wa.audience = ?)"); values.push(filters.audience); }
@@ -282,6 +282,19 @@ export async function listAdminWholesalePackages(db: D1Database, filters: Wholes
   if (filters.category) { clauses.push("EXISTS (SELECT 1 FROM wholesale_package_categories wc INNER JOIN categories c ON c.id = wc.category_id WHERE wc.package_id = w.id AND c.slug = ?)"); values.push(filters.category); }
   if (filters.state) { clauses.push("w.state = ?"); values.push(filters.state); }
   if (filters.search?.trim()) { const pattern = `%${escapeLike(filters.search.trim())}%`; clauses.push("(w.name LIKE ? ESCAPE '\\' OR w.reference LIKE ? ESCAPE '\\')"); values.push(pattern, pattern); }
+  const promoEligible = filters.promoEligible;
+  if (promoEligible !== undefined) {
+    clauses.push(`${promoEligible ? "" : "NOT "}EXISTS (
+      SELECT 1 FROM promotion_wholesale_packages pw
+      INNER JOIN promotions active_promotion ON active_promotion.id = pw.promotion_id
+      WHERE pw.package_id = w.id
+        AND active_promotion.paused = 0
+        AND active_promotion.start_at <= ?
+        AND active_promotion.end_at > ?
+    )`);
+    const timestamp = new Date().toISOString();
+    values.push(timestamp, timestamp);
+  }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const page = filters.page ?? 1;
   const pageSize = filters.limit ?? 24;

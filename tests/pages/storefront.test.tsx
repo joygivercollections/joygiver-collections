@@ -92,7 +92,11 @@ describe("Joygiver storefront", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("limit=8"),
+      expect.stringContaining("condition=new&audience=women"),
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("condition=thrifted&audience=kids"),
       expect.anything(),
     );
   });

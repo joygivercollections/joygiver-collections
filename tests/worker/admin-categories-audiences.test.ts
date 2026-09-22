@@ -5,6 +5,7 @@ import {
   adminRequest,
   apiRequest,
   createProduct,
+  createWholesalePackage,
   resetStore,
   seedAdminSession,
 } from "./helpers";
@@ -68,4 +69,35 @@ it("does not remove an audience while products still require it", async () => {
   await expect(response.json()).resolves.toMatchObject({
     code: "clothing_type_audience_conflict",
   });
+});
+
+it("does not remove an audience while a wholesale package still requires it", async () => {
+  await createWholesalePackage({
+    categoryIds: ["cat_two_piece_sets"],
+    audiences: ["women", "men"],
+  });
+
+  const response = await adminRequest("/api/admin/categories/cat_two_piece_sets", {
+    method: "PUT",
+    body: JSON.stringify({
+      name: "Two-piece Sets",
+      displayOrder: 50,
+      active: true,
+      audiences: ["women"],
+    }),
+  });
+
+  expect(response.status).toBe(409);
+  await expect(response.json()).resolves.toMatchObject({
+    code: "clothing_type_audience_conflict",
+    wholesaleCount: 1,
+  });
+});
+
+it("does not retire a clothing type referenced only by wholesale", async () => {
+  await createWholesalePackage({ categoryIds: ["cat_two_piece_sets"], audiences: ["women"] });
+  const response = await adminRequest("/api/admin/categories/cat_two_piece_sets", { method: "DELETE" });
+
+  expect(response.status).toBe(409);
+  await expect(response.json()).resolves.toMatchObject({ code: "category_in_use", productCount: 0, wholesaleCount: 1 });
 });

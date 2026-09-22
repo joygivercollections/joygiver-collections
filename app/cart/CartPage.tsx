@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { FamilyCartLine, InvalidCartReason, ValidatedCart, ValidatedFamilyCartLine } from "../../shared/contracts";
 import { formatNaira, getStoreConfig, validateCart } from "../api";
@@ -22,6 +22,7 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
   const [validation, setValidation] = useState<ValidatedCart>({ valid: [], invalid: [], subtotalKobo: 0 });
   const [checking, setChecking] = useState(false);
   const [validationError, setValidationError] = useState(false);
+  const validationRequest = useRef(0);
   const [resolvedWhatsAppNumber, setResolvedWhatsAppNumber] = useState(whatsAppNumber ?? storeConfig.whatsAppNumber);
   const selected = useMemo(() => lines.filter((line) => line.selected), [lines]);
   const lineKey = (line: FamilyCartLine) => line.itemType === "wholesale" ? `wholesale:${line.packageId}` : `retail:${line.productId}:${line.size}`;
@@ -35,16 +36,20 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
   }, [whatsAppNumber, resolvedWhatsAppNumber]);
 
   useEffect(() => {
+    const requestId = ++validationRequest.current;
     if (selected.length === 0) {
       setValidation({ valid: [], invalid: [], subtotalKobo: 0 });
       setChecking(false);
+      setValidationError(false);
       return;
     }
     const controller = new AbortController();
+    setValidation({ valid: [], invalid: [], subtotalKobo: 0 });
     setChecking(true);
     setValidationError(false);
     validateCart(selected, controller.signal)
       .then((result) => {
+        if (validationRequest.current !== requestId) return;
         setValidation(result);
         const invalidKeys = new Set(result.invalid.filter((line) => line.reason !== "quantity_reduced").map(lineKey));
         const validByKey = new Map(result.valid.map((line) => [lineKey(line), line]));
@@ -65,9 +70,11 @@ export function CartPage({ whatsAppNumber }: { whatsAppNumber?: string }) {
         if (changed) saveCart(next);
       })
       .catch((caught: unknown) => {
-        if (!(caught instanceof DOMException && caught.name === "AbortError")) setValidationError(true);
+        if (validationRequest.current === requestId && !(caught instanceof DOMException && caught.name === "AbortError")) setValidationError(true);
       })
-      .finally(() => setChecking(false));
+      .finally(() => {
+        if (validationRequest.current === requestId) setChecking(false);
+      });
     return () => controller.abort();
     // The serialized key intentionally represents only the selected order payload.
   }, [validationKey]);
