@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import type { Product } from "../../shared/contracts";
 import { formatNaira, getProduct } from "../api";
 import { RouteError } from "../components/RouteError";
+import { ProductGallery } from "../components/ProductGallery";
 import { upsertCartLine } from "../cart/cart-store";
 
 export function ProductPage() {
@@ -39,11 +40,7 @@ export function ProductPage() {
         <span>{product.name}</span>
       </nav>
       <div className="product-detail__grid">
-        <div className="product-gallery">
-          {product.images.length ? product.images.map((image) => (
-            <img key={image.id} src={image.url} alt={image.alt} />
-          )) : <div className="product-gallery__placeholder"><span aria-hidden="true">J</span></div>}
-        </div>
+        <ProductGallery images={product.images} />
         <section className="product-info">
           <div className="product-info__badges">
             <span className={`condition-badge condition-badge--${product.condition}`}>{product.condition === "new" ? "New" : "Thrifted"}</span>

@@ -82,7 +82,7 @@ export function CategoriesPage() {
       {notice ? <p className="admin-notice" role="status">{notice}</p> : null}
       <form className="category-create" onSubmit={create}>
         <label>New clothing type name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Blazers" /></label>
-        <fieldset><legend>Available for</legend>{audienceOptions.map(({ value, label }) => <label key={value}><input type="checkbox" checked={newAudiences.includes(value)} onChange={() => toggleNewAudience(value)} />{label}</label>)}</fieldset>
+        <fieldset className="admin-checklist"><legend>Available for</legend>{audienceOptions.map(({ value, label }) => <label key={value}><input type="checkbox" checked={newAudiences.includes(value)} onChange={() => toggleNewAudience(value)} />{label}</label>)}</fieldset>
         <button className="button button--dark" type="submit">Add clothing type</button>
       </form>
       <section className="category-list" aria-label="Clothing Types">
@@ -91,7 +91,7 @@ export function CategoriesPage() {
             <span className="category-list__order">{String(index + 1).padStart(2, "0")}</span>
             <label>Clothing type name<input value={category.name} onChange={(event) => setCategories((items) => items.map((item) => item.id === category.id ? { ...item, name: event.target.value } : item))} /></label>
             <label>Display order<input type="number" min="0" value={category.displayOrder} onChange={(event) => setCategories((items) => items.map((item) => item.id === category.id ? { ...item, displayOrder: Number(event.target.value) } : item))} /></label>
-            <fieldset><legend>Audiences</legend>{audienceOptions.map(({ value, label }) => <label key={value}><input type="checkbox" aria-label={`${label} for ${category.name}`} checked={category.audiences.includes(value)} onChange={() => toggleCategoryAudience(category.id, value)} />{label}</label>)}</fieldset>
+            <fieldset className="admin-checklist"><legend>Audiences</legend>{audienceOptions.map(({ value, label }) => <label key={value}><input type="checkbox" aria-label={`${label} for ${category.name}`} checked={category.audiences.includes(value)} onChange={() => toggleCategoryAudience(category.id, value)} />{label}</label>)}</fieldset>
             <span className={`status status--${category.active ? "available" : "hidden"}`}>{category.active ? "active" : "retired"}</span>
             <button type="button" aria-label={`Save ${category.name}`} onClick={() => save(category)}>Save</button>
             {category.active ? <button className="danger-link" type="button" onClick={() => retire(category)}>Retire</button> : null}

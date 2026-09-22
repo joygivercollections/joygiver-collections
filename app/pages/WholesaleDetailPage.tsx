@@ -4,6 +4,7 @@ import type { WholesalePackage } from "../../shared/contracts";
 import { formatNaira, getWholesalePackage } from "../api";
 import { upsertWholesaleCartLine } from "../cart/cart-store";
 import { RouteError } from "../components/RouteError";
+import { ProductGallery } from "../components/ProductGallery";
 
 export function WholesaleDetailPage() {
   const { slug = "" } = useParams();
@@ -28,7 +29,7 @@ export function WholesaleDetailPage() {
     <main className="wholesale-detail page-width">
       <nav className="breadcrumbs" aria-label="Breadcrumb"><Link to="/">Home</Link><span>/</span><Link to="/wholesale">Wholesale</Link><span>/</span><span>{item.name}</span></nav>
       <div className="product-detail__grid">
-        <div className="product-gallery">{item.images.length ? item.images.map((image) => <img key={image.id} src={image.url} alt={image.alt} />) : <div className="product-gallery__placeholder"><span>J</span></div>}</div>
+        <ProductGallery images={item.images} label="Wholesale package images" />
         <section className="product-info">
           <div className="product-info__badges"><span className="condition-badge">{item.conditionScope}</span>{item.promoEligible ? <span className="condition-badge condition-badge--promo">Promo</span> : null}{sold ? <span className="condition-badge condition-badge--sold">Sold</span> : null}</div>
           <p className="eyebrow">{audience} · {item.reference}</p><h1>{item.name}</h1><p className="product-info__price">{formatNaira(item.priceKobo)}</p>
