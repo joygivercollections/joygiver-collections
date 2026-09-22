@@ -122,7 +122,7 @@ export const cartValidationSchema = z.object({
       for (const [index, item] of items.entries()) {
         const identity = item.itemType === "wholesale"
           ? `wholesale:${item.packageId}`
-          : `retail:${item.productId}:${item.size}`;
+          : `retail:${item.productId}:${item.size.toLocaleLowerCase()}`;
         if (identities.has(identity)) {
           context.addIssue({
             code: "custom",

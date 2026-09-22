@@ -119,7 +119,7 @@ Use this order for the family-commerce release. The database migration is additi
    ```
 
 2. Confirm `npx wrangler whoami` shows the Joygiver Cloudflare account.
-3. Apply `0002_family_catalogue_promotions_wholesale.sql` remotely before deploying the new code:
+3. Apply all pending migrations, including `0002_family_catalogue_promotions_wholesale.sql` and `0003_promotion_schedule_guards.sql`, remotely before deploying the new code:
 
    ```powershell
    npm run db:migrate:remote
@@ -177,6 +177,6 @@ Rotate a Worker secret by running `npx wrangler secret put <SECRET_NAME>` and su
 
 ## Rollback safety
 
-If the staging deployment fails, roll the Worker code back to the previous Cloudflare deployment while leaving the additive `0002` tables and columns in place. Do not drop the `0002` schema in production: the earlier Worker can continue while the additive data remains.
+If the staging deployment fails, roll the Worker code back to the previous Cloudflare deployment while leaving the additive `0002` tables/columns and the `0003` promotion guards in place. Do not drop either schema migration in production: the earlier Worker can continue while these additive changes remain.
 
 Restore D1 from the pre-release export only when data corruption is confirmed, not merely because code rollback is needed. Preserve every R2 object referenced by either the previous or current deployment until the rollback has been verified end to end, including owner login, catalogue reads, cart validation, and image delivery.

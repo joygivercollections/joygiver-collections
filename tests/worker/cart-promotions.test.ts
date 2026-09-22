@@ -53,7 +53,7 @@ it("rejects duplicate line identities before stock and promotion calculation", a
   const product = await createProduct({ stockQuantity: 3, priceKobo: 10_000 });
   const pkg = await createWholesalePackage({ stockQuantity: 2, priceKobo: 20_000 });
   const response = await apiRequest("/api/cart/validate", { method: "POST", body: JSON.stringify({ items: [
-    { itemType: "retail", productId: product.id, size: "M", quantity: 2, lastKnownPriceKobo: 10_000 },
+    { itemType: "retail", productId: product.id, size: "m", quantity: 2, lastKnownPriceKobo: 10_000 },
     { itemType: "retail", productId: product.id, size: "M", quantity: 2, lastKnownPriceKobo: 10_000 },
     { itemType: "wholesale", packageId: pkg.id, quantity: 1, lastKnownPriceKobo: 20_000 },
     { itemType: "wholesale", packageId: pkg.id, quantity: 2, lastKnownPriceKobo: 20_000 },
