@@ -18,13 +18,51 @@ it("requires matching new passwords before account update", async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-it("shows how many products block category retirement", async () => {
-  const category = { id: "gowns", name: "Gowns", slug: "gowns", active: true, displayOrder: 1 };
+it("shows how many products block clothing type retirement", async () => {
+  const category = { id: "gowns", name: "Gowns", slug: "gowns", active: true, displayOrder: 1, audiences: ["women"] };
   vi.stubGlobal("fetch", vi.fn()
     .mockResolvedValueOnce(new Response(JSON.stringify([category]), { status: 200, headers: { "Content-Type": "application/json" } }))
     .mockResolvedValueOnce(new Response(JSON.stringify({ status: 409, code: "category_in_use", message: "Reassign products", productCount: 3 }), { status: 409, headers: { "Content-Type": "application/json" } })));
   const user = userEvent.setup();
   render(<MemoryRouter><CategoriesPage /></MemoryRouter>);
   await user.click(await screen.findByRole("button", { name: /retire/i }));
-  expect(await screen.findByText(/3 products must be reassigned/i)).toBeVisible();
+  expect(await screen.findByText(/3 retail products must be reassigned/i)).toBeVisible();
+});
+
+it("lets the owner assign a clothing type to multiple audiences", async () => {
+  const category = { id: "jeans", name: "Jeans", slug: "jeans", active: true, displayOrder: 1, audiences: ["women", "men", "kids"] };
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify([category]), { status: 200, headers: { "Content-Type": "application/json" } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ...category, audiences: ["women", "men"] }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><CategoriesPage /></MemoryRouter>);
+  const kids = await screen.findByRole("checkbox", { name: /kids.*jeans/i });
+  await user.click(kids);
+  await user.click(screen.getByRole("button", { name: /save jeans/i }));
+
+  expect(fetchMock).toHaveBeenLastCalledWith(
+    "/api/admin/categories/jeans",
+    expect.objectContaining({ body: expect.stringContaining('"audiences":["women","men"]') }),
+  );
+});
+
+it("reactivates a retired clothing type without changing its details", async () => {
+  const category = { id: "maxi-skirts", name: "Maxi Skirts", slug: "maxi-skirts", active: false, displayOrder: 19, audiences: ["women"] };
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify([category]), { status: 200, headers: { "Content-Type": "application/json" } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ...category, active: true }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><CategoriesPage /></MemoryRouter>);
+  await user.click(await screen.findByRole("button", { name: /reactivate maxi skirts/i }));
+
+  expect(fetchMock).toHaveBeenLastCalledWith(
+    "/api/admin/categories/maxi-skirts",
+    expect.objectContaining({ body: JSON.stringify({ name: "Maxi Skirts", displayOrder: 19, active: true, audiences: ["women"] }) }),
+  );
+  expect(await screen.findByText(/maxi skirts was reactivated/i)).toBeVisible();
+  expect(screen.getByRole("button", { name: /retire maxi skirts/i })).toBeVisible();
 });

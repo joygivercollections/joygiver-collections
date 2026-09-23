@@ -1,27 +1,38 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../cart/cart-store";
-import { storeConfig } from "../config";
+import { getSiteSettings } from "../api";
+import { defaultSiteSettings } from "../config";
 import { MobileMenu } from "./MobileMenu";
 import { SocialLinks } from "./SocialLinks";
 
 export function Layout() {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const navigate = useNavigate();
   const location = useLocation();
   const cart = useCart();
   const cartCount = cart.reduce((count, line) => count + line.quantity, 0);
-  const collectionRouteOrder: Record<string, number> = { "/": 0, "/new": 1, "/thrifted": 2 };
-  const currentRouteOrder = collectionRouteOrder[location.pathname];
+  const currentRouteOrder = location.pathname === "/" ? 0
+    : location.pathname.startsWith("/new") ? 1
+      : location.pathname.startsWith("/thrifted") ? 2
+        : undefined;
   const previousRouteOrder = useRef(currentRouteOrder);
   const transitionDirection = currentRouteOrder === undefined || previousRouteOrder.current === undefined || currentRouteOrder === previousRouteOrder.current
     ? ""
     : currentRouteOrder > previousRouteOrder.current ? "forward" : "backward";
 
   useEffect(() => {
-    previousRouteOrder.current = currentRouteOrder;
-  }, [currentRouteOrder]);
+    const controller = new AbortController();
+    getSiteSettings(controller.signal).then(setSiteSettings).catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const isRedirectRoot = location.pathname === "/new" || location.pathname === "/thrifted";
+    if (!isRedirectRoot) previousRouteOrder.current = currentRouteOrder;
+  }, [currentRouteOrder, location.pathname]);
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
@@ -38,12 +49,13 @@ export function Layout() {
       <header className="site-header">
         <div className="site-header__top page-width">
           <NavLink className="wordmark" to="/" aria-label="Joygiver Collections home">
-            <img className="wordmark__image" src={storeConfig.logoUrl} alt="" />
+            <img data-testid="site-logo" className="wordmark__image" src={siteSettings.logoUrl} alt="" />
           </NavLink>
           <nav className="desktop-nav" aria-label="Primary navigation">
             <NavLink to="/">Home</NavLink>
             <NavLink to="/new">New</NavLink>
             <NavLink to="/thrifted">Thrifted</NavLink>
+            <NavLink to="/wholesale">Wholesale</NavLink>
             <NavLink to="/about">About Us</NavLink>
             <NavLink to="/contact">Contact</NavLink>
           </nav>
@@ -94,6 +106,7 @@ export function Layout() {
             <p className="eyebrow">Shop</p>
             <NavLink to="/new">New collection</NavLink>
             <NavLink to="/thrifted">Thrifted collection</NavLink>
+            <NavLink to="/wholesale">Wholesale packages</NavLink>
           </div>
           <div>
             <p className="eyebrow">Delivery</p>

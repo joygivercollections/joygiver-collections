@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
-import type { CategorySummary, CatalogueFilters, ProductCondition, ProductSummary } from "../../shared/contracts";
+import { Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
+import type { Audience, CategorySummary, CatalogueFilters, ProductCondition, ProductSummary } from "../../shared/contracts";
 import { buildProductQuery, getCategories, getProducts } from "../api";
+import { AudienceTabs } from "../components/AudienceTabs";
 import { FilterSheet } from "../components/FilterSheet";
 import { ProductGrid } from "../components/ProductGrid";
 import { RouteError } from "../components/RouteError";
 
-function fromSearchParams(params: URLSearchParams, condition?: ProductCondition): CatalogueFilters {
+function fromSearchParams(params: URLSearchParams, condition?: ProductCondition, audience?: Audience): CatalogueFilters {
   const page = Number(params.get("page") || "1");
   return {
     condition,
+    audience,
     category: params.get("category") || undefined,
     size: params.get("size") || undefined,
     search: params.get("search") || undefined,
@@ -22,6 +24,11 @@ function fromSearchParams(params: URLSearchParams, condition?: ProductCondition)
 }
 
 export function CataloguePage({ condition }: { condition?: ProductCondition }) {
+  const { audience: audienceParam } = useParams();
+  const audience = audienceParam === "women" || audienceParam === "men" || audienceParam === "kids"
+    ? audienceParam
+    : condition && !audienceParam ? "women" : undefined;
+  const invalidAudience = Boolean(condition && audienceParam && !audience);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const [products, setProducts] = useState<ProductSummary[] | null>(null);
@@ -30,17 +37,19 @@ export function CataloguePage({ condition }: { condition?: ProductCondition }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [error, setError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
-  const filters = useMemo(() => fromSearchParams(searchParams, condition), [searchParams, condition]);
+  const filters = useMemo(() => fromSearchParams(searchParams, condition, audience), [searchParams, condition, audience]);
   const requestKey = buildProductQuery(filters);
 
   useEffect(() => {
     const controller = new AbortController();
-    getCategories(controller.signal).then(setCategories).catch(() => undefined);
+    if (invalidAudience) return () => controller.abort();
+    getCategories(audience, controller.signal).then(setCategories).catch(() => undefined);
     return () => controller.abort();
-  }, []);
+  }, [audience, invalidAudience]);
 
   useEffect(() => {
     const controller = new AbortController();
+    if (invalidAudience) return () => controller.abort();
     setError(false);
     getProducts(filters, controller.signal)
       .then((result) => {
@@ -52,7 +61,7 @@ export function CataloguePage({ condition }: { condition?: ProductCondition }) {
       });
     return () => controller.abort();
     // requestKey captures all URL-backed filters without re-fetching for object identity.
-  }, [requestKey, retryKey]);
+  }, [requestKey, retryKey, invalidAudience]);
 
   const applyFilters = useCallback((next: CatalogueFilters) => {
     const query = new URLSearchParams();
@@ -68,7 +77,10 @@ export function CataloguePage({ condition }: { condition?: ProductCondition }) {
     setFilterOpen(false);
   }, [location.pathname, setSearchParams]);
 
-  const heading = condition === "new" ? "The New Collection" : condition === "thrifted" ? "Thrifted Treasures" : "The Full Collection";
+  if (invalidAudience) return <Navigate to={`/${condition}/women`} replace />;
+
+  const audienceLabel = audience === "men" ? "Men" : audience === "kids" ? "Kids" : "Women";
+  const heading = condition === "new" ? `New for ${audienceLabel}` : condition === "thrifted" ? `Thrifted for ${audienceLabel}` : "The Full Collection";
   const intro = condition === "new"
     ? "Fresh silhouettes and considered staples, selected for effortless everyday polish."
     : condition === "thrifted"
@@ -83,6 +95,7 @@ export function CataloguePage({ condition }: { condition?: ProductCondition }) {
         <h1>{heading}</h1>
         <p>{intro}</p>
       </header>
+      {condition && audience ? <AudienceTabs condition={condition} current={audience} /> : null}
       {filters.search ? <p className="search-summary">Showing results for <strong>“{filters.search}”</strong></p> : null}
       <div className="catalogue__toolbar">
         <p>{products ? `${total} ${total === 1 ? "piece" : "pieces"}` : "Loading the edit…"}</p>

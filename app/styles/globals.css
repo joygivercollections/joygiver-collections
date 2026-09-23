@@ -7,6 +7,8 @@
   text-rendering: optimizeLegibility;
   --warm-white: #fcfbf8;
   --ivory: #f5f1e8;
+  --blush: #ead8d3;
+  --cream: #eee7da;
   --charcoal: #22211f;
   --champagne: #b79a64;
   --champagne-dark: #917644;
@@ -64,4 +66,5 @@ fieldset { min-width: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  .page-transition--forward, .page-transition--backward, .mobile-menu, .filter-sheet, .promotion-banner { animation: none !important; transition: none !important; }
 }

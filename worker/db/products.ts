@@ -1,15 +1,27 @@
 import type {
   AdminProduct,
+  Audience,
   CatalogueFilters,
-  CartLine,
+  FamilyCartLine,
   InventorySummary,
   Paginated,
   Product,
   ProductImage,
   ProductSummary,
   ValidatedCart,
+  ValidatedFamilyCartLine,
 } from "../../shared/contracts";
 import type { ProductInput } from "../../shared/validation";
+import {
+  deleteRegisteredImage,
+  ImageStorageError,
+  imageUrl,
+  reorderRegisteredImages,
+  storeRegisteredImage,
+} from "../lib/images";
+import { getActivePromotion } from "./promotions";
+import { getWholesaleForCart } from "./wholesale";
+import { calculatePromotion } from "../lib/promotions";
 
 const SOLD_VISIBILITY_MS = 48 * 60 * 60 * 1_000;
 
@@ -32,6 +44,8 @@ interface ProductRow {
   featured: number;
   published: number;
   published_at: string | null;
+  is_unisex: number;
+  audiences_json: string;
   primary_image_key: string | null;
   primary_image_alt: string | null;
 }
@@ -55,14 +69,7 @@ function parseStringArray(value: string): string[] {
   return parsed;
 }
 
-function imageUrl(objectKey: string): string {
-  return `/media/${objectKey
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/")}`;
-}
-
-function mapSummary(row: ProductRow): ProductSummary {
+function mapSummary(row: ProductRow, promoEligible = false): ProductSummary {
   if (!row.published_at) {
     throw new Error("Published product is missing its publication time");
   }
@@ -78,6 +85,9 @@ function mapSummary(row: ProductRow): ProductSummary {
       name: row.category_name,
       slug: row.category_slug,
     },
+    audiences: parseStringArray(row.audiences_json) as Audience[],
+    isUnisex: row.is_unisex === 1,
+    ...(promoEligible ? { promoEligible: true } : {}),
     sizes: parseStringArray(row.sizes_json),
     tags: parseStringArray(row.tags_json),
     stockQuantity: row.stock_quantity,
@@ -122,6 +132,13 @@ function buildWhere(
   if (filters.condition) {
     clauses.push("p.condition = ?");
     values.push(filters.condition);
+  }
+  if (filters.audience) {
+    clauses.push(`EXISTS (
+      SELECT 1 FROM product_audiences pa
+      WHERE pa.product_id = p.id AND pa.audience = ?
+    )`);
+    values.push(filters.audience);
   }
   if (filters.category) {
     clauses.push("c.slug = ?");
@@ -168,6 +185,16 @@ const SELECT_PRODUCT = `
     p.condition, p.category_id, c.name AS category_name,
     c.slug AS category_slug, p.sizes_json, p.tags_json,
     p.stock_quantity, p.state, p.sold_at, p.featured, p.published, p.published_at,
+    p.is_unisex,
+    COALESCE((
+      SELECT json_group_array(audience)
+      FROM (
+        SELECT pa.audience AS audience
+        FROM product_audiences pa
+        WHERE pa.product_id = p.id
+        ORDER BY pa.audience ASC
+      )
+    ), '[]') AS audiences_json,
     (
       SELECT pi.object_key FROM product_images pi
       WHERE pi.product_id = p.id
@@ -217,8 +244,10 @@ export async function listPublicProducts(
   const countResult = results[0] as D1Result<CountRow>;
   const rowsResult = results[1] as D1Result<ProductRow>;
 
+  const promotion = await getActivePromotion(db, now);
+  const eligible = new Set(promotion?.productIds ?? []);
   return {
-    items: rowsResult.results.map(mapSummary),
+    items: rowsResult.results.map((row) => mapSummary(row, eligible.has(row.id))),
     page,
     pageSize,
     total: Number(countResult.results[0]?.total ?? 0),
@@ -259,8 +288,9 @@ export async function getPublicProduct(
     displayOrder: image.display_order,
   }));
 
+  const promotion = await getActivePromotion(db, now);
   return {
-    ...mapSummary(row),
+    ...mapSummary(row, promotion?.productIds.includes(row.id) ?? false),
     description: row.description,
     featured: row.featured === 1,
     images: mappedImages,
@@ -291,9 +321,10 @@ async function listProductImages(
 async function mapAdminProduct(
   db: D1Database,
   row: ProductRow,
+  promoEligible = false,
 ): Promise<AdminProduct> {
   const summary = row.published_at
-    ? mapSummary(row)
+    ? mapSummary(row, promoEligible)
     : {
         id: row.id,
         reference: row.reference,
@@ -306,6 +337,9 @@ async function mapAdminProduct(
           name: row.category_name,
           slug: row.category_slug,
         },
+        audiences: parseStringArray(row.audiences_json) as Audience[],
+        isUnisex: row.is_unisex === 1,
+        ...(promoEligible ? { promoEligible: true } : {}),
         sizes: parseStringArray(row.sizes_json),
         tags: parseStringArray(row.tags_json),
         stockQuantity: row.stock_quantity,
@@ -396,7 +430,34 @@ export async function getAdminProduct(
   id: string,
 ): Promise<AdminProduct | null> {
   const row = await productRowById(db, id);
-  return row ? mapAdminProduct(db, row) : null;
+  if (!row) return null;
+  const promotion = await getActivePromotion(db, new Date());
+  return mapAdminProduct(db, row, promotion?.productIds.includes(row.id) ?? false);
+}
+
+export class ClothingTypeAudienceError extends Error {
+  constructor() {
+    super("The selected clothing type is not available for every selected audience");
+    this.name = "ClothingTypeAudienceError";
+  }
+}
+
+async function ensureCategoryAudiences(
+  db: D1Database,
+  categoryId: string,
+  audiences: Audience[],
+): Promise<void> {
+  const result = await db
+    .prepare(
+      `SELECT audience FROM category_audiences
+       WHERE category_id = ?`,
+    )
+    .bind(categoryId)
+    .all<{ audience: Audience }>();
+  const assigned = new Set(result.results.map((row) => row.audience));
+  if (audiences.some((audience) => !assigned.has(audience))) {
+    throw new ClothingTypeAudienceError();
+  }
 }
 
 export async function createAdminProduct(
@@ -404,6 +465,7 @@ export async function createAdminProduct(
   input: ProductInput,
   now = new Date(),
 ): Promise<AdminProduct> {
+  await ensureCategoryAudiences(db, input.categoryId, input.audiences);
   const id = crypto.randomUUID();
   const reference = input.reference?.trim().toUpperCase() || (await uniqueReference(db));
   const slug = await uniqueProductSlug(db, input.name);
@@ -415,8 +477,9 @@ export async function createAdminProduct(
         `INSERT INTO products (
           id, reference, slug, name, description, price_kobo, condition,
           category_id, sizes_json, tags_json, stock_quantity, state,
-          featured, published, published_at, sold_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?, ?, ?, NULL, ?, ?)`,
+          featured, published, published_at, sold_at, created_at, updated_at,
+          is_unisex
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?, ?, ?, NULL, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -435,7 +498,15 @@ export async function createAdminProduct(
         publishedAt,
         timestamp,
         timestamp,
+        input.isUnisex ? 1 : 0,
       ),
+    ...input.audiences.map((audience) =>
+      db
+        .prepare(
+          "INSERT INTO product_audiences (product_id, audience) VALUES (?, ?)",
+        )
+        .bind(id, audience),
+    ),
   ]);
   const created = await getAdminProduct(db, id);
   if (!created) throw new Error("Created product could not be read");
@@ -450,6 +521,7 @@ export async function updateAdminProduct(
 ): Promise<AdminProduct | null> {
   const existing = await productRowById(db, id);
   if (!existing) return null;
+  await ensureCategoryAudiences(db, input.categoryId, input.audiences);
   const reference = input.reference?.trim().toUpperCase() || existing.reference;
   const slug = await uniqueProductSlug(db, input.name, id);
   const publishedAt = input.published
@@ -462,6 +534,7 @@ export async function updateAdminProduct(
           reference = ?, slug = ?, name = ?, description = ?, price_kobo = ?,
           condition = ?, category_id = ?, sizes_json = ?, tags_json = ?,
           stock_quantity = ?, featured = ?, published = ?, published_at = ?,
+          is_unisex = ?,
           updated_at = ?
          WHERE id = ?`,
       )
@@ -479,9 +552,18 @@ export async function updateAdminProduct(
         input.featured ? 1 : 0,
         input.published ? 1 : 0,
         publishedAt,
+        input.isUnisex ? 1 : 0,
         now.toISOString(),
         id,
       ),
+    db.prepare("DELETE FROM product_audiences WHERE product_id = ?").bind(id),
+    ...input.audiences.map((audience) =>
+      db
+        .prepare(
+          "INSERT INTO product_audiences (product_id, audience) VALUES (?, ?)",
+        )
+        .bind(id, audience),
+    ),
   ]);
   return getAdminProduct(db, id);
 }
@@ -517,8 +599,8 @@ export async function deleteAdminProduct(
 export async function getInventorySummary(
   db: D1Database,
 ): Promise<InventorySummary> {
-  const row = await db
-    .prepare(
+  const [summaryResult, audienceResult] = await db.batch([
+    db.prepare(
       `SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN state = 'available' THEN 1 ELSE 0 END) AS available,
@@ -527,8 +609,18 @@ export async function getInventorySummary(
         SUM(CASE WHEN condition = 'new' THEN 1 ELSE 0 END) AS new_count,
         SUM(CASE WHEN condition = 'thrifted' THEN 1 ELSE 0 END) AS thrifted_count
        FROM products`,
-    )
-    .first<Record<string, number | null>>();
+    ),
+    db.prepare(
+      `SELECT audience, COUNT(DISTINCT product_id) AS total
+       FROM product_audiences
+       GROUP BY audience`,
+    ),
+  ]);
+  const row = (summaryResult as D1Result<Record<string, number | null>>).results[0];
+  const byAudience = { women: 0, men: 0, kids: 0 };
+  for (const item of (audienceResult as D1Result<{ audience: Audience; total: number }>).results) {
+    byAudience[item.audience] = Number(item.total ?? 0);
+  }
   return {
     total: Number(row?.total ?? 0),
     available: Number(row?.available ?? 0),
@@ -536,6 +628,9 @@ export async function getInventorySummary(
     hidden: Number(row?.hidden ?? 0),
     new: Number(row?.new_count ?? 0),
     thrifted: Number(row?.thrifted_count ?? 0),
+    retailByAudience: byAudience,
+    availableWholesalePackages: 0,
+    promotion: null,
   };
 }
 
@@ -545,7 +640,9 @@ export async function listAdminProducts(
     search?: string;
     state?: "available" | "sold" | "hidden";
     condition?: "new" | "thrifted";
+    audience?: Audience;
     category?: string;
+    promoEligible?: boolean;
     page?: number;
     limit?: number;
   } = {},
@@ -565,9 +662,28 @@ export async function listAdminProducts(
     clauses.push("p.condition = ?");
     values.push(options.condition);
   }
+  if (options.audience) {
+    clauses.push(`EXISTS (
+      SELECT 1 FROM product_audiences pa
+      WHERE pa.product_id = p.id AND pa.audience = ?
+    )`);
+    values.push(options.audience);
+  }
   if (options.category) {
     clauses.push("c.slug = ?");
     values.push(options.category);
+  }
+  if (options.promoEligible !== undefined) {
+    clauses.push(`${options.promoEligible ? "" : "NOT "}EXISTS (
+      SELECT 1 FROM promotion_products pp
+      INNER JOIN promotions active_promotion ON active_promotion.id = pp.promotion_id
+      WHERE pp.product_id = p.id
+        AND active_promotion.paused = 0
+        AND active_promotion.start_at <= ?
+        AND active_promotion.end_at > ?
+    )`);
+    const timestamp = new Date().toISOString();
+    values.push(timestamp, timestamp);
   }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const page = options.page ?? 1;
@@ -588,26 +704,27 @@ export async function listAdminProducts(
       .bind(...values, pageSize, (page - 1) * pageSize),
   ]);
   const rows = (rowsResult as D1Result<ProductRow>).results;
+  const promotion = await getActivePromotion(db, new Date());
+  const eligible = new Set(promotion?.productIds ?? []);
   return {
-    items: await Promise.all(rows.map((row) => mapAdminProduct(db, row))),
+    items: await Promise.all(rows.map((row) => mapAdminProduct(db, row, eligible.has(row.id)))),
     page,
     pageSize,
     total: Number((countResult as D1Result<CountRow>).results[0]?.total ?? 0),
   };
 }
 
-interface CartValidationInput {
-  productId: string;
-  size: string;
-  quantity: number;
-  lastKnownPriceKobo: number;
-}
+type CartValidationInput =
+  | { itemType?: "retail"; productId: string; size: string; quantity: number; lastKnownPriceKobo: number }
+  | { itemType: "wholesale"; packageId: string; quantity: number; lastKnownPriceKobo: number };
 
 export async function validateCart(
   db: D1Database,
   items: CartValidationInput[],
 ): Promise<ValidatedCart> {
-  const ids = Array.from(new Set(items.map((item) => item.productId)));
+  const retailInputs = items.filter((item): item is Extract<CartValidationInput, { productId: string }> => item.itemType !== "wholesale");
+  const wholesaleInputs = items.filter((item): item is Extract<CartValidationInput, { itemType: "wholesale" }> => item.itemType === "wholesale");
+  const ids = Array.from(new Set(retailInputs.map((item) => item.productId)));
   const placeholders = ids.map(() => "?").join(", ");
   const rows = ids.length
     ? await db
@@ -616,12 +733,27 @@ export async function validateCart(
         .all<ProductRow>()
     : { results: [] as ProductRow[] };
   const byId = new Map(rows.results.map((row) => [row.id, row]));
+  const wholesaleRows = await getWholesaleForCart(db, Array.from(new Set(wholesaleInputs.map((item) => item.packageId))));
+  const wholesaleById = new Map(wholesaleRows.map((row) => [row.id, row]));
   const valid: ValidatedCart["valid"] = [];
   const invalid: ValidatedCart["invalid"] = [];
 
   for (const input of items) {
+    if (input.itemType === "wholesale") {
+      const row = wholesaleById.get(input.packageId);
+      const baseLine: FamilyCartLine = { itemType: "wholesale", packageId: input.packageId, reference: row?.reference ?? "Unavailable", name: row?.name ?? "Unavailable package", quantity: input.quantity, lastKnownPriceKobo: input.lastKnownPriceKobo, imageUrl: row?.primaryImage?.url ?? null, selected: true };
+      if (!row) { invalid.push({ ...baseLine, reason: "deleted" }); continue; }
+      if (row.state === "sold") { invalid.push({ ...baseLine, reason: "sold" }); continue; }
+      if (row.state === "hidden" || !row.published) { invalid.push({ ...baseLine, reason: "hidden" }); continue; }
+      if (row.stockQuantity <= 0) { invalid.push({ ...baseLine, reason: "out_of_stock" }); continue; }
+      const quantity = Math.min(input.quantity, row.stockQuantity);
+      if (quantity < input.quantity) invalid.push({ ...baseLine, quantity, reason: "quantity_reduced" });
+      valid.push({ ...baseLine, reference: row.reference, name: row.name, quantity, canonicalPriceKobo: row.priceKobo, priceChanged: row.priceKobo !== input.lastKnownPriceKobo, discountedQuantity: 0, discountKobo: 0 });
+      continue;
+    }
     const row = byId.get(input.productId);
-    const baseLine: CartLine = {
+    const baseLine: FamilyCartLine = {
+      itemType: "retail",
       productId: input.productId,
       reference: row?.reference ?? "Unavailable",
       name: row?.name ?? "Unavailable product",
@@ -654,63 +786,54 @@ export async function validateCart(
     }
     if (input.quantity > availableQuantity) {
       invalid.push({ ...baseLine, quantity: availableQuantity, reason: "quantity_reduced" });
-      continue;
     }
     valid.push({
       ...baseLine,
       reference: row.reference,
       name: row.name,
+      quantity: Math.min(input.quantity, availableQuantity),
       canonicalPriceKobo: row.price_kobo,
       priceChanged: row.price_kobo !== input.lastKnownPriceKobo,
+      discountedQuantity: 0,
+      discountKobo: 0,
     });
   }
+
+  const regularSubtotalKobo = valid.reduce((sum, line) => sum + line.canonicalPriceKobo * line.quantity, 0);
+  const promotion = await getActivePromotion(db, new Date());
+  let promotionBreakdown: ValidatedCart["promotion"] = null;
+  let discountKobo = 0;
+  if (promotion) {
+    const eligibleProducts = new Set(promotion.productIds);
+    const eligiblePackages = new Set(promotion.wholesalePackageIds);
+    const calculated = calculatePromotion(valid.map((line) => ({
+      key: line.itemType === "wholesale" ? `wholesale:${line.packageId}` : `retail:${line.productId}:${line.size}`,
+      unitPriceKobo: line.canonicalPriceKobo,
+      quantity: line.quantity,
+      eligible: line.itemType === "wholesale" ? eligiblePackages.has(line.packageId) : eligibleProducts.has(line.productId),
+    })), promotion);
+    const allocations = new Map(calculated.lines.map((line) => [line.key, line]));
+    for (let index = 0; index < valid.length; index += 1) {
+      const line = valid[index];
+      const key = line.itemType === "wholesale" ? `wholesale:${line.packageId}` : `retail:${line.productId}:${line.size}`;
+      const allocation = allocations.get(key) ?? { discountedQuantity: 0, discountKobo: 0 };
+      valid[index] = { ...line, ...allocation } as ValidatedFamilyCartLine;
+    }
+    discountKobo = calculated.discountKobo;
+    promotionBreakdown = { id: promotion.id, name: promotion.name, requiredQuantity: promotion.requiredQuantity, discountBasisPoints: promotion.discountBasisPoints, eligibleQuantity: calculated.eligibleQuantity, discountedQuantity: calculated.discountedQuantity, discountKobo };
+  }
+  const finalSubtotalKobo = regularSubtotalKobo - discountKobo;
   return {
     valid,
     invalid,
-    subtotalKobo: valid.reduce(
-      (sum, line) => sum + line.canonicalPriceKobo * line.quantity,
-      0,
-    ),
+    subtotalKobo: finalSubtotalKobo,
+    regularSubtotalKobo,
+    promotion: promotionBreakdown,
+    finalSubtotalKobo,
   };
 }
 
-export class ProductImageError extends Error {
-  constructor(
-    public readonly code: string,
-    public readonly status: 413 | 415 | 409 | 503,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-function detectImageType(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return "image/jpeg";
-  }
-  if (
-    bytes.length >= 8 &&
-    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every(
-      (value, index) => bytes[index] === value,
-    )
-  ) {
-    return "image/png";
-  }
-  if (
-    bytes.length >= 12 &&
-    String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
-  ) {
-    return "image/webp";
-  }
-  return null;
-}
-
-function extensionFor(type: "image/jpeg" | "image/png" | "image/webp"): string {
-  if (type === "image/jpeg") return "jpg";
-  if (type === "image/png") return "png";
-  return "webp";
-}
+export { ImageStorageError as ProductImageError };
 
 export async function storeProductImage(
   db: D1Database,
@@ -719,84 +842,7 @@ export async function storeProductImage(
   file: File,
   altText?: string,
 ): Promise<ProductImage> {
-  if (file.size > 8 * 1_024 * 1_024) {
-    throw new ProductImageError("image_too_large", 413, "Each image must be 8 MiB or smaller");
-  }
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    throw new ProductImageError("unsupported_image_type", 415, "Use a JPEG, PNG, or WebP image");
-  }
-  const detected = detectImageType(new Uint8Array(await file.slice(0, 12).arrayBuffer()));
-  if (!detected || detected !== file.type) {
-    throw new ProductImageError("unsupported_image_type", 415, "Image contents do not match the file type");
-  }
-  const product = await productRowById(db, productId);
-  if (!product) throw new Error("PRODUCT_NOT_FOUND");
-  const count =
-    (await db
-      .prepare("SELECT COUNT(*) AS total FROM product_images WHERE product_id = ?")
-      .bind(productId)
-      .first<number>("total")) ?? 0;
-  if (count >= 6) {
-    throw new ProductImageError("image_limit_reached", 409, "A product can have at most six images");
-  }
-
-  const id = crypto.randomUUID();
-  const objectKey = `products/${productId}/${crypto.randomUUID()}.${extensionFor(detected)}`;
-  try {
-    await bucket.put(objectKey, file.stream(), {
-      httpMetadata: { contentType: detected },
-    });
-  } catch {
-    throw new ProductImageError("image_storage_unavailable", 503, "Image storage is temporarily unavailable");
-  }
-
-  const timestamp = new Date().toISOString();
-  try {
-    await db
-      .prepare(
-        `INSERT INTO product_images
-         (id, product_id, object_key, alt_text, content_type, display_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        productId,
-        objectKey,
-        altText?.trim() || product.name,
-        detected,
-        count,
-        timestamp,
-        timestamp,
-      )
-      .run();
-  } catch (error) {
-    await bucket.delete(objectKey).catch(() => undefined);
-    throw error;
-  }
-  return {
-    id,
-    url: imageUrl(objectKey),
-    alt: altText?.trim() || product.name,
-    displayOrder: count,
-  };
-}
-
-export async function findRegisteredImage(
-  db: D1Database,
-  objectKey: string,
-): Promise<{ id: string; objectKey: string; contentType: string } | null> {
-  const row = await db
-    .prepare(
-      `SELECT id, object_key, content_type
-       FROM product_images
-       WHERE object_key = ?
-       LIMIT 1`,
-    )
-    .bind(objectKey)
-    .first<{ id: string; object_key: string; content_type: string }>();
-  return row
-    ? { id: row.id, objectKey: row.object_key, contentType: row.content_type }
-    : null;
+  return storeRegisteredImage(db, bucket, { ownerType: "product", ownerId: productId }, file, altText);
 }
 
 export async function deleteProductImage(
@@ -805,21 +851,7 @@ export async function deleteProductImage(
   productId: string,
   imageId: string,
 ): Promise<boolean> {
-  const row = await db
-    .prepare(
-      `SELECT object_key FROM product_images
-       WHERE id = ? AND product_id = ?`,
-    )
-    .bind(imageId, productId)
-    .first<{ object_key: string }>();
-  if (!row) return false;
-  try {
-    await bucket.delete(row.object_key);
-  } catch {
-    throw new ProductImageError("image_storage_unavailable", 503, "Image storage is temporarily unavailable");
-  }
-  await db.prepare("DELETE FROM product_images WHERE id = ?").bind(imageId).run();
-  return true;
+  return deleteRegisteredImage(db, bucket, { ownerType: "product", ownerId: productId }, imageId);
 }
 
 export async function reorderProductImages(
@@ -827,25 +859,5 @@ export async function reorderProductImages(
   productId: string,
   imageIds: string[],
 ): Promise<ProductImage[] | null> {
-  const current = await db
-    .prepare("SELECT id FROM product_images WHERE product_id = ? ORDER BY display_order, id")
-    .bind(productId)
-    .all<{ id: string }>();
-  const currentIds = current.results.map((row) => row.id).sort();
-  if (
-    currentIds.length !== imageIds.length ||
-    currentIds.some((id, index) => id !== [...imageIds].sort()[index])
-  ) {
-    return null;
-  }
-  await db.batch(
-    imageIds.map((id, index) =>
-      db
-        .prepare(
-          "UPDATE product_images SET display_order = ?, updated_at = ? WHERE id = ? AND product_id = ?",
-        )
-        .bind(index, new Date().toISOString(), id, productId),
-    ),
-  );
-  return listProductImages(db, productId);
+  return reorderRegisteredImages(db, { ownerType: "product", ownerId: productId }, imageIds);
 }

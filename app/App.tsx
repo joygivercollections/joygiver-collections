@@ -13,6 +13,13 @@ import { CategoriesPage } from "./admin/CategoriesPage";
 import { AccountPage } from "./admin/AccountPage";
 import { AboutPage } from "./pages/AboutPage";
 import { ContactPage } from "./pages/ContactPage";
+import { WholesalePage } from "./pages/WholesalePage";
+import { WholesaleDetailPage } from "./pages/WholesaleDetailPage";
+import { WholesalePage as AdminWholesalePage } from "./admin/WholesalePage";
+import { WholesaleForm } from "./admin/WholesaleForm";
+import { PromotionsPage } from "./admin/PromotionsPage";
+import { PromotionForm } from "./admin/PromotionForm";
+import { SiteSettingsPage } from "./admin/SiteSettingsPage";
 
 export function App() {
   return (
@@ -23,16 +30,27 @@ export function App() {
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/new" element={<ProductForm />} />
         <Route path="products/:id" element={<ProductForm />} />
+        <Route path="wholesale" element={<AdminWholesalePage />} />
+        <Route path="wholesale/new" element={<WholesaleForm />} />
+        <Route path="wholesale/:id" element={<WholesaleForm />} />
+        <Route path="promotions" element={<PromotionsPage />} />
+        <Route path="promotions/new" element={<PromotionForm />} />
+        <Route path="promotions/:id" element={<PromotionForm />} />
+        <Route path="site-settings" element={<SiteSettingsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
-        <Route path="new" element={<CataloguePage condition="new" />} />
-        <Route path="thrifted" element={<CataloguePage condition="thrifted" />} />
+        <Route path="new" element={<Navigate to="/new/women" replace />} />
+        <Route path="new/:audience" element={<CataloguePage condition="new" />} />
+        <Route path="thrifted" element={<Navigate to="/thrifted/women" replace />} />
+        <Route path="thrifted/:audience" element={<CataloguePage condition="thrifted" />} />
         <Route path="search" element={<CataloguePage />} />
         <Route path="product/:slug" element={<ProductPage />} />
         <Route path="cart" element={<CartPage />} />
+        <Route path="wholesale" element={<WholesalePage />} />
+        <Route path="wholesale/:slug" element={<WholesaleDetailPage />} />
         <Route path="about" element={<AboutPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

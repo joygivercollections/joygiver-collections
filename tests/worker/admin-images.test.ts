@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { storeProductImage } from "../../worker/db/products";
+import { deleteProductImage, storeProductImage } from "../../worker/db/products";
 import {
   adminRequest,
   apiRequest,
@@ -87,6 +87,16 @@ describe("product image integrity", () => {
     await expect(
       storeProductImage(env.DB, failingBucket, product.id, jpegFile()),
     ).rejects.toMatchObject({ code: "image_storage_unavailable" });
+    expect(await imageCount()).toBe(0);
+  });
+
+  it("removes database metadata before best-effort object cleanup", async () => {
+    const product = await createProduct();
+    const uploaded = await uploadImage(product.id, jpegFile());
+    const body = await uploaded.json() as { images: Array<{ id: string }> };
+    const failingBucket = { delete: async () => { throw new Error("R2 unavailable"); } } as unknown as R2Bucket;
+
+    await expect(deleteProductImage(env.DB, failingBucket, product.id, body.images[0].id)).resolves.toBe(true);
     expect(await imageCount()).toBe(0);
   });
 });

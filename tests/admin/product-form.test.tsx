@@ -7,7 +7,7 @@ import { ProductForm } from "../../app/admin/ProductForm";
 it("retains product fields and identifies an oversized image", async () => {
   const created = { id: "new-product", reference: "JGC-NEW", slug: "champagne-maxi-skirt", images: [] };
   vi.stubGlobal("fetch", vi.fn(async (input) => {
-    if (String(input).includes("/categories")) return new Response(JSON.stringify([{ id: "maxi", name: "Maxi Skirts", slug: "maxi-skirts", active: true, displayOrder: 1 }]), { status: 200, headers: { "Content-Type": "application/json" } });
+    if (String(input).includes("/categories")) return new Response(JSON.stringify([{ id: "maxi", name: "Maxi Skirts", slug: "maxi-skirts", active: true, displayOrder: 1, audiences: ["women"] }]), { status: 200, headers: { "Content-Type": "application/json" } });
     return new Response(JSON.stringify(created), { status: 201, headers: { "Content-Type": "application/json" } });
   }));
   const user = userEvent.setup();
@@ -16,10 +16,29 @@ it("retains product fields and identifies an oversized image", async () => {
   await user.type(screen.getByLabelText(/^description/i), "Elegant flowing maxi skirt");
   await user.type(screen.getByLabelText(/price in naira/i), "24000");
   await user.selectOptions(await screen.findByLabelText(/^category/i), "maxi");
+  await user.click(screen.getByLabelText("Women"));
   await user.click(screen.getByLabelText(/^medium/i));
   const oversized = new File([new Uint8Array(8 * 1024 * 1024 + 1)], "oversized.jpg", { type: "image/jpeg" });
   await user.upload(screen.getByLabelText(/product images/i), oversized);
   await user.click(screen.getByRole("button", { name: /save product/i }));
   expect(screen.getByLabelText(/product name/i)).toHaveValue("Champagne Maxi Skirt");
   expect(await screen.findByText(/oversized.jpg could not be uploaded/i)).toBeVisible();
+});
+
+it("requires an owner to choose at least one audience", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (input) => {
+    if (String(input).includes("/categories")) {
+      return new Response(JSON.stringify([
+        { id: "sets", name: "Two-piece Sets", slug: "two-piece-sets", active: true, displayOrder: 1, audiences: ["women", "men", "kids"] },
+      ]), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    throw new Error(`Unexpected request: ${String(input)}`);
+  }));
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><ProductForm /></MemoryRouter>);
+  await screen.findByLabelText(/^category/i);
+  await user.click(screen.getByRole("button", { name: /save product/i }));
+
+  expect(await screen.findByText(/choose at least one audience/i)).toBeVisible();
 });

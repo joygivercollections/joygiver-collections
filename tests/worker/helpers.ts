@@ -1,5 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { hashSessionToken, SESSION_COOKIE } from "../../worker/lib/session";
+import type { ProductInput, WholesalePackageInput } from "../../shared/validation";
 
 export const storeOrigin = "https://joygivercollections.com";
 export const adminToken = "test-admin-session";
@@ -15,11 +16,34 @@ export const validProductInput = {
   stockQuantity: 2,
   featured: true,
   published: true,
-};
+  audiences: ["women"],
+  isUnisex: false,
+} satisfies ProductInput;
+
+export const validWholesaleInput = {
+  name: "Family Denim Bale",
+  description: "A photographed wholesale package containing assorted denim pieces.",
+  audiences: ["women", "men"],
+  conditionScope: "mixed" as const,
+  categoryIds: ["cat_jeans"],
+  pieceCount: 24,
+  priceKobo: 18_000_000,
+  stockQuantity: 3,
+  featured: true,
+  published: true,
+} satisfies WholesalePackageInput;
 
 export async function resetStore() {
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM promotion_products"),
+    env.DB.prepare("DELETE FROM promotion_wholesale_packages"),
+    env.DB.prepare("DELETE FROM promotions"),
+    env.DB.prepare("DELETE FROM wholesale_package_images"),
+    env.DB.prepare("DELETE FROM wholesale_package_categories"),
+    env.DB.prepare("DELETE FROM wholesale_package_audiences"),
+    env.DB.prepare("DELETE FROM wholesale_packages"),
     env.DB.prepare("DELETE FROM product_images"),
+    env.DB.prepare("DELETE FROM product_audiences"),
     env.DB.prepare("DELETE FROM products"),
     env.DB.prepare("DELETE FROM sessions"),
     env.DB.prepare("DELETE FROM login_attempts"),
@@ -66,7 +90,7 @@ export function adminRequest(path: string, init: RequestInit = {}) {
 }
 
 export async function createProduct(
-  overrides: Partial<typeof validProductInput> = {},
+  overrides: Partial<ProductInput> = {},
 ) {
   const response = await adminRequest("/api/admin/products", {
     method: "POST",
@@ -81,6 +105,27 @@ export async function createProduct(
     slug: string;
     name: string;
     priceKobo: number;
+    state: "available" | "sold" | "hidden";
+    soldAt: string | null;
+    publishedAt: string;
+  }>;
+}
+
+export async function createWholesalePackage(
+  overrides: Partial<WholesalePackageInput> = {},
+) {
+  const response = await adminRequest("/api/admin/wholesale", {
+    method: "POST",
+    body: JSON.stringify({ ...validWholesaleInput, ...overrides }),
+  });
+  if (response.status !== 201) {
+    throw new Error(`Wholesale creation returned ${response.status}: ${await response.text()}`);
+  }
+  return response.json() as Promise<{
+    id: string;
+    reference: string;
+    slug: string;
+    name: string;
     state: "available" | "sold" | "hidden";
     soldAt: string | null;
     publishedAt: string;
