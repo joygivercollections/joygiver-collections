@@ -453,10 +453,6 @@
 .account-form .admin-notice { margin: 18px 0 0; }
 .account-form .button { margin-top: 24px; }
 .wholesale-page { padding-block: 64px 100px; }
-.wholesale-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 34px 0 48px; padding: 22px; border: 1px solid var(--border); }
-.wholesale-filters label { display: grid; gap: 6px; font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.wholesale-filters input, .wholesale-filters select { min-width: 0; height: 44px; border: 1px solid var(--border); padding: 0 10px; background: white; }
-.wholesale-filters > label:first-child, .wholesale-filters .button { grid-column: 1 / -1; }
 .wholesale-grid { display: grid; gap: 38px 18px; }
 .wholesale-card { display: grid; gap: 16px; }
 .wholesale-card__image { position: relative; aspect-ratio: 4 / 3; display: grid; place-items: center; overflow: hidden; background: var(--cream); }
@@ -578,9 +574,6 @@
   .category-list article > .admin-checklist { grid-column: 2 / -1; }
   .category-list__actions { grid-template-columns: auto minmax(0, 1fr) 120px; }
   .category-list__actions button:last-child { grid-column: auto; }
-  .wholesale-filters { grid-template-columns: repeat(5, minmax(120px, 1fr)); }
-  .wholesale-filters > label:first-child { grid-column: span 2; }
-  .wholesale-filters .button { grid-column: auto; align-self: end; }
   .wholesale-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .promotion-eligibility { grid-template-columns: 1fr 1fr; }
   .site-assets { grid-template-columns: 1fr 1fr; }

@@ -119,7 +119,6 @@ export function Layout() {
         </div>
         <div className="page-width site-footer__bottom">
           <p>© {new Date().getFullYear()} Joygiver Collections</p>
-          <NavLink to="/owner/login">Owner sign in</NavLink>
         </div>
       </footer>
     </div>

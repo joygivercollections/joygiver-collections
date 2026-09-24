@@ -44,6 +44,7 @@ it("keeps normal collection links and traps then restores drawer focus", async (
 it("fits a 320 pixel viewport without a rendered element exceeding it", async () => {
   render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
   await screen.findByRole("heading", { name: /style for every story/i });
+  expect(screen.queryByRole("link", { name: /owner sign in/i })).not.toBeInTheDocument();
   const tooWide = Array.from(document.body.querySelectorAll<HTMLElement>("*")).filter((element) => element.getBoundingClientRect().width > document.documentElement.clientWidth + 1);
   expect(tooWide).toEqual([]);
 });

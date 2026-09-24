@@ -14,19 +14,27 @@ const packageItem = {
 };
 
 it("preserves package fields when a representative image upload fails", async () => {
-  vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+  const categoryOptions = [
+    { id: "cat-shirts", name: "Shirts", slug: "shirts", active: true, displayOrder: 1, audiences: ["women", "men"] },
+    { id: "cat-gowns", name: "Gowns", slug: "gowns", active: true, displayOrder: 2, audiences: ["women"] },
+    { id: "cat-tops", name: "Tops", slug: "tops", active: true, displayOrder: 3, audiences: ["women", "kids"] },
+  ];
+  const fetchMock = vi.fn(async (input, init) => {
     const url = String(input);
-    if (url.includes("/api/admin/categories")) return new Response(JSON.stringify([{ id: "cat-jeans", name: "Jeans", slug: "jeans", active: true, displayOrder: 1, audiences: ["women"] }]), { status: 200, headers: { "Content-Type": "application/json" } });
-    if (url.endsWith("/api/admin/wholesale") && init?.method === "POST") return new Response(JSON.stringify({ ...packageItem, audiences: ["women"] }), { status: 201, headers: { "Content-Type": "application/json" } });
+    if (url.includes("/api/admin/categories")) return new Response(JSON.stringify(categoryOptions), { status: 200, headers: { "Content-Type": "application/json" } });
+    if (url.endsWith("/api/admin/wholesale") && init?.method === "POST") return new Response(JSON.stringify({ ...packageItem, audiences: ["women"], categories: categoryOptions }), { status: 201, headers: { "Content-Type": "application/json" } });
     if (url.includes("/images")) return new Response(JSON.stringify({ status: 503, code: "image_storage_unavailable", message: "Try again" }), { status: 503, headers: { "Content-Type": "application/json" } });
     throw new Error(`Unexpected request: ${url}`);
-  }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
   const user = userEvent.setup();
   render(<MemoryRouter><WholesaleForm /></MemoryRouter>);
   await user.type(screen.getByLabelText(/package name/i), "Family Denim Bale");
   await user.type(screen.getByLabelText(/^description/i), "A photographed package of assorted denim pieces.");
   await user.click(screen.getByLabelText("Women"));
-  await user.click(await screen.findByLabelText("Jeans"));
+  await user.click(await screen.findByLabelText("Shirts"));
+  await user.click(screen.getByLabelText("Gowns"));
+  await user.click(screen.getByLabelText("Tops"));
   await user.type(screen.getByLabelText(/piece count/i), "24");
   await user.type(screen.getByLabelText(/price in naira/i), "180000");
   await user.upload(screen.getByLabelText(/package images/i), new File([new Uint8Array([0xff, 0xd8, 0xff])], "bale.jpg", { type: "image/jpeg" }));
@@ -35,6 +43,10 @@ it("preserves package fields when a representative image upload fails", async ()
   expect(await screen.findByText(/bale.jpg could not be uploaded/i)).toBeVisible();
   expect(screen.getByLabelText(/package name/i)).toHaveValue("Family Denim Bale");
   expect(screen.getByLabelText(/piece count/i)).toHaveValue(24);
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/admin/wholesale",
+    expect.objectContaining({ body: expect.stringContaining('"categoryIds":["cat-shirts","cat-gowns","cat-tops"]') }),
+  );
 });
 
 it("supports sold, restore, hide, and exact-reference deletion controls", async () => {
