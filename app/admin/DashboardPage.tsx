@@ -17,7 +17,17 @@ export function DashboardPage() {
       <section className="stat-grid" aria-label="Inventory summary">
         {[['Total pieces', summary?.total], ['Available', summary?.available], ['Sold', summary?.sold], ['New', summary?.new], ['Thrifted', summary?.thrifted]].map(([label, value], index) => <article key={String(label)}><span>0{index + 1}</span><strong>{value ?? "—"}</strong><p>{label}</p></article>)}
       </section>
-      <section className="admin-quick-actions"><div><p className="eyebrow">Quick actions</p><h2>Keep the edit current.</h2></div><div><Link to="/owner/products/new"><strong>Add new arrival</strong><span>Upload photos and publish a piece →</span></Link><Link to="/owner/products"><strong>Manage inventory</strong><span>Mark sold, hide or update products →</span></Link><Link to="/owner/categories"><strong>Organise categories</strong><span>Keep shopping filters useful →</span></Link></div></section>
+      <section className="audience-summary" aria-label="Retail audiences">
+        <article><strong>{summary?.retailByAudience.women ?? "—"}</strong><p>Women</p></article>
+        <article><strong>{summary?.retailByAudience.men ?? "—"}</strong><p>Men</p></article>
+        <article><strong>{summary?.retailByAudience.kids ?? "—"}</strong><p>Kids</p></article>
+        <article><strong>{summary?.availableWholesalePackages ?? "—"}</strong><p>Wholesale available</p></article>
+      </section>
+      <section className="promotion-overview" aria-label="Promotion overview">
+        <p className="eyebrow">{summary?.promotion?.status === "active" ? "Current promotion" : "Next promotion"}</p>
+        {summary?.promotion ? <><h2>{summary.promotion.name}</h2><p>{summary.promotion.requiredQuantity} eligible items unlock {summary.promotion.discountBasisPoints / 100}% off each complete group.</p></> : <><h2>No promotion scheduled.</h2><p>Create a timed offer whenever the collection is ready.</p></>}
+      </section>
+      <section className="admin-quick-actions"><div><p className="eyebrow">Quick actions</p><h2>Keep the edit current.</h2></div><div><Link to="/owner/products"><strong>Products</strong><span>Add, update, hide, or mark pieces sold →</span></Link><Link to="/owner/wholesale"><strong>Wholesale</strong><span>Manage package photos, counts, and prices →</span></Link><Link to="/owner/promotions"><strong>Promotions</strong><span>Schedule complete-group discounts →</span></Link><Link to="/owner/categories"><strong>Clothing Types</strong><span>Set types for Women, Men, and Kids →</span></Link><Link to="/owner/site-settings"><strong>Site Settings</strong><span>Replace the logo, hero, and homepage copy →</span></Link></div></section>
     </main>
   );
 }

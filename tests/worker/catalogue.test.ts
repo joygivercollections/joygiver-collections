@@ -2,6 +2,7 @@ import { env, exports } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { listPublicProducts } from "../../worker/db/products";
+import { createProduct, resetStore, seedAdminSession } from "./helpers";
 
 interface SeedProduct {
   id: string;
@@ -66,7 +67,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await clearProducts();
+  await resetStore();
+  await seedAdminSession();
 });
 
 describe("listPublicProducts", () => {
@@ -126,15 +128,17 @@ describe("listPublicProducts", () => {
 });
 
 describe("public catalogue routes", () => {
-  it("returns the eight active categories", async () => {
+  it("returns all active family clothing types", async () => {
     const response = await exports.default.fetch(
       new Request("https://joygivercollections.com/api/categories"),
     );
 
     expect(response.status).toBe(200);
     const categories = (await response.json()) as Array<{ slug: string }>;
-    expect(categories).toHaveLength(8);
+    expect(categories).toHaveLength(17);
     expect(categories.map((category) => category.slug)).toContain("gowns");
+    expect(categories.map((category) => category.slug)).toContain("shirts");
+    expect(categories.map((category) => category.slug)).toContain("dresses");
   });
 
   it("rejects an unsupported condition and oversized page", async () => {
@@ -162,5 +166,39 @@ describe("public catalogue routes", () => {
 
     expect(response.status).toBe(200);
     expect(body.items.map((item) => item.id)).toEqual(["thrift-gown"]);
+  });
+
+  it("shows a Unisex product only in its owner-selected audience pages", async () => {
+    const product = await createProduct({
+      audiences: ["women", "men"],
+      isUnisex: true,
+    });
+
+    const women = (await (await exports.default.fetch(new Request(
+      "https://joygivercollections.com/api/products?condition=new&audience=women",
+    ))).json()) as { items: Array<{ id: string; isUnisex: boolean; audiences: string[] }> };
+    const men = (await (await exports.default.fetch(new Request(
+      "https://joygivercollections.com/api/products?condition=new&audience=men",
+    ))).json()) as typeof women;
+    const kids = (await (await exports.default.fetch(new Request(
+      "https://joygivercollections.com/api/products?condition=new&audience=kids",
+    ))).json()) as typeof women;
+
+    expect(women.items[0]).toMatchObject({
+      id: product.id,
+      isUnisex: true,
+      audiences: ["men", "women"],
+    });
+    expect(men.items[0].id).toBe(product.id);
+    expect(kids.items).toEqual([]);
+  });
+
+  it("rejects an unknown audience without querying it", async () => {
+    const response = await exports.default.fetch(new Request(
+      "https://joygivercollections.com/api/products?audience=adult",
+    ));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: "invalid_audience" });
   });
 });

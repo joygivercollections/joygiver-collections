@@ -86,6 +86,41 @@ describe("admin product management", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({ productCount: 1 });
   });
+
+  it("rejects an incompatible audience update without partially changing the product", async () => {
+    const product = await createProduct({
+      name: "Ivory Mini Skirt",
+      categoryId: "cat_mini_skirts",
+      audiences: ["women"],
+    });
+
+    const response = await adminRequest(`/api/admin/products/${product.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        ...validProductInput,
+        name: "Changed name",
+        categoryId: "cat_mini_skirts",
+        audiences: ["men"],
+        reference: product.reference,
+      }),
+    });
+    const unchangedResponse = await adminRequest(`/api/admin/products/${product.id}`);
+    const unchanged = (await unchangedResponse.json()) as {
+      name: string;
+      category: { id: string };
+      audiences: string[];
+    };
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "clothing_type_audience_conflict",
+    });
+    expect(unchanged).toMatchObject({
+      name: "Ivory Mini Skirt",
+      category: { id: "cat_mini_skirts" },
+      audiences: ["women"],
+    });
+  });
 });
 
 describe("cart validation", () => {

@@ -29,7 +29,7 @@ export function LoginPage() {
     <main className="owner-login">
       <section className="owner-login__brand">
         <Link to="/" className="owner-login__mark" aria-label="Return to Joygiver Collections"><span>J</span></Link>
-        <div><p className="eyebrow">Joygiver Collections</p><h1>Your collection,<br /><em>beautifully managed.</em></h1><p>Update your catalogue, track availability, and keep every product detail in one calm place.</p></div>
+        <div><p className="eyebrow">Joygiver Collections</p><h1>Your collection,<br /><span>beautifully managed.</span></h1><p>Update your catalogue, track availability, and keep every product detail in one calm place.</p></div>
       </section>
       <section className="owner-login__form-wrap">
         <form className="owner-login__form" onSubmit={submit}>

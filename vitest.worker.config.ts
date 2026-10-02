@@ -28,5 +28,8 @@ export default defineConfig({
   ],
   test: {
     include: ["tests/worker/**/*.test.ts"],
+    // Bound Miniflare concurrency so individual requests are not starved on Windows hosts.
+    maxWorkers: 1,
+    testTimeout: 10_000,
   },
 });

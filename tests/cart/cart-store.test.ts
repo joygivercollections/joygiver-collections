@@ -8,9 +8,17 @@ const lineB: CartLine = { productId: "b", reference: "JGC-B", name: "Indigo jean
 beforeEach(() => localStorage.clear());
 
 describe("guest cart storage", () => {
+  it("migrates valid version-one retail lines and saves version two", () => {
+    localStorage.setItem("joygiver-cart", JSON.stringify({ version: 1, lines: [lineA] }));
+    const migrated = loadCart();
+    expect(migrated[0]).toMatchObject({ itemType: "retail", productId: "a", size: "M" });
+    saveCart(migrated);
+    expect(JSON.parse(String(localStorage.getItem("joygiver-cart")))).toMatchObject({ version: 2 });
+  });
+
   it("persists item selection and restores a versioned cart", () => {
     saveCart([lineA, lineB]);
-    expect(loadCart().map(({ productId, selected }) => ({ productId, selected }))).toEqual([
+    expect(loadCart().map((line) => ({ productId: line.itemType === "wholesale" ? line.packageId : line.productId, selected: line.selected }))).toEqual([
       { productId: lineA.productId, selected: false },
       { productId: lineB.productId, selected: true },
     ]);
@@ -20,6 +28,12 @@ describe("guest cart storage", () => {
     localStorage.setItem("joygiver-cart", "not-json");
     expect(loadCart()).toEqual([]);
     localStorage.setItem("joygiver-cart", JSON.stringify({ version: 99, lines: [lineA] }));
+    expect(loadCart()).toEqual([]);
+    localStorage.setItem("joygiver-cart", JSON.stringify({ version: 2, lines: [{ itemType: "wholesale", packageId: 5 }] }));
+    expect(loadCart()).toEqual([]);
+    localStorage.setItem("joygiver-cart", JSON.stringify({ version: 2, lines: [{ ...lineA, itemType: "giftcard" }] }));
+    expect(loadCart()).toEqual([]);
+    localStorage.setItem("joygiver-cart", JSON.stringify({ version: 2, lines: [{ ...lineA, itemType: "retail", lastKnownPriceKobo: 0 }] }));
     expect(loadCart()).toEqual([]);
   });
 

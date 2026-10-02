@@ -8,7 +8,8 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     exclude: ["tests/worker/**", "node_modules/**"],
     css: true,
-    // Keep jsdom interaction tests below their 5s limit on Windows hosts.
+    // Windows image/file interaction tests can exceed the default while workers contend.
+    testTimeout: 10_000,
     maxWorkers: 4,
   },
 });

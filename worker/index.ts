@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { authRoutes } from "./routes/auth";
 import { adminRoutes } from "./routes/admin";
 import { publicRoutes } from "./routes/public";
-import { findRegisteredImage } from "./db/products";
+import { findRegisteredImage } from "./lib/images";
 
 export interface Env {
   DB: D1Database;
