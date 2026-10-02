@@ -65,7 +65,7 @@ These commands modify the selected Cloudflare account. Confirm the active accoun
    npm run deploy
    ```
 
-6. The permanent staging URL is `https://joygiver-collections.joygivercollections.workers.dev`. The Wrangler route also declares `joygivercollections.com` as a custom domain; it can be added later, after the domain is active in the same Cloudflare account. Confirm the staging deployment before changing live DNS.
+6. The permanent staging URL is `https://joygiver-collections.joygivercollections.workers.dev`. Wrangler declares both `joygivercollections.com` and `www.joygivercollections.com` as custom domains; the Worker redirects `www` requests to the primary apex domain. Confirm the staging deployment before changing live DNS.
 
 ## One-time owner creation
 

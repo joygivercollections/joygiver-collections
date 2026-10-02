@@ -15,6 +15,12 @@ export interface Env {
 const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", async (context, next) => {
+  const url = new URL(context.req.url);
+  if (url.hostname === "www.joygivercollections.com") {
+    url.hostname = "joygivercollections.com";
+    return context.redirect(url.toString(), 308);
+  }
+
   await next();
   context.header("X-Content-Type-Options", "nosniff");
   context.header("X-Frame-Options", "DENY");
@@ -25,7 +31,7 @@ app.use("*", async (context, next) => {
     "Content-Security-Policy",
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
   );
-  if (new URL(context.req.url).pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith("/api/")) {
     context.header("Cache-Control", "no-store");
   }
 });

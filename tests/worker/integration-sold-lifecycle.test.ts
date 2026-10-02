@@ -31,3 +31,16 @@ it("adds browser security headers and prevents API responses from being cached",
   expect(response.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
   expect(response.headers.get("Cache-Control")).toBe("no-store");
 });
+
+it("redirects the www hostname to the primary domain while preserving the request", async () => {
+  const response = await exports.default.fetch(
+    new Request("https://www.joygivercollections.com/new?audience=women", {
+      redirect: "manual",
+    }),
+  );
+
+  expect(response.status).toBe(308);
+  expect(response.headers.get("Location")).toBe(
+    "https://joygivercollections.com/new?audience=women",
+  );
+});

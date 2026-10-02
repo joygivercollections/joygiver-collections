@@ -4,6 +4,16 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-19",
   "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "joygivercollections.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.joygivercollections.com",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
