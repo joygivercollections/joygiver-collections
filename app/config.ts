@@ -3,11 +3,11 @@ export const storeConfig = {
   // Replace these file paths or overwrite the matching files in public/brand.
   logoUrl: "/brand/joygiver-logo.jpeg",
   heroArtUrl: "/brand/family-hero.png",
-  // Add the real profile URLs when they are available.
+  // Keep unavailable social profiles blank so they are not displayed.
   socialLinks: {
     facebook: "",
-    instagram: "",
-    tiktok: "",
+    instagram: "https://www.instagram.com/joygivercollections001/",
+    tiktok: "https://www.tiktok.com/@joygivercollections",
   },
 };
 

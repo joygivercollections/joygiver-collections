@@ -37,8 +37,8 @@ export function SocialLinks({ className = "", whatsAppNumber = storeConfig.whats
     { name: "tiktok", href: storeConfig.socialLinks.tiktok },
   ];
 
-  return <div className={`social-links ${className}`.trim()}>{links.map(({ name, href }) => (
-    <a key={name} aria-label={labels[name]} aria-disabled={!href} href={href || "#"} onClick={(event) => { if (!href) event.preventDefault(); }} target={href ? "_blank" : undefined} rel={href ? "noreferrer" : undefined} title={href ? labels[name] : `${labels[name]} link coming soon`}>
+  return <div className={`social-links ${className}`.trim()}>{links.filter(({ href }) => Boolean(href)).map(({ name, href }) => (
+    <a key={name} aria-label={labels[name]} href={href} target="_blank" rel="noreferrer" title={labels[name]}>
       <SocialIcon name={name} />
     </a>
   ))}</div>;

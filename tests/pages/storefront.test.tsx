@@ -188,9 +188,10 @@ describe("Joygiver storefront", () => {
     expect(within(menu).getByRole("link", { name: /wholesale/i })).toHaveAttribute("href", "/wholesale");
     expect(within(menu).getByRole("link", { name: /about us/i })).toHaveAttribute("href", "/about");
     expect(within(menu).getByRole("link", { name: /^contact$/i })).toHaveAttribute("href", "/contact");
-    for (const channel of ["WhatsApp", "Facebook", "Instagram", "TikTok"]) {
+    for (const channel of ["WhatsApp", "Instagram", "TikTok"]) {
       expect(within(menu).getByLabelText(channel)).toBeVisible();
     }
+    expect(within(menu).queryByLabelText("Facebook")).not.toBeInTheDocument();
     expect(within(menu).queryByRole("link", { name: /^new$/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /close menu/i })).toHaveFocus();
   });
@@ -203,7 +204,8 @@ describe("Joygiver storefront", () => {
     expect(screen.getByRole("heading", { name: settings.heroHeading })).toBeVisible();
     expect(document.querySelector("em, i")).not.toBeInTheDocument();
     const footer = screen.getByRole("contentinfo");
-    for (const channel of ["Facebook", "Instagram", "TikTok"]) expect(within(footer).getByLabelText(channel)).toBeVisible();
+    for (const channel of ["Instagram", "TikTok"]) expect(within(footer).getByLabelText(channel)).toBeVisible();
+    expect(within(footer).queryByLabelText("Facebook")).not.toBeInTheDocument();
     await waitFor(() => expect(within(footer).getByLabelText(/whatsapp/i)).toHaveAttribute("href", "https://wa.me/2348030000000"));
   });
 
