@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ownerApi, type OwnerSession } from "../api";
+import { OwnerInstall } from "./OwnerInstall";
 
 export function AdminLayout() {
   const [owner, setOwner] = useState<OwnerSession | null>(null);
@@ -21,7 +22,7 @@ export function AdminLayout() {
     return () => controller.abort();
   }, []);
 
-  if (checking || !owner) return <main className="admin-loading"><span>J</span><p>Opening your dashboard…</p></main>;
+  if (checking || !owner) return <><OwnerInstall /><main className="admin-loading"><span>J</span><p>Opening your dashboard…</p></main></>;
 
   async function logout() {
     await ownerApi.logout().catch(() => undefined);
@@ -33,7 +34,7 @@ export function AdminLayout() {
     : <span className="admin-brand__mark" aria-hidden="true">J</span>;
 
   return (
-    <div className="admin-shell">
+    <><OwnerInstall /><div className="admin-shell">
       <aside className="admin-sidebar">
         <NavLink className="admin-brand" to="/owner">{brandMark}<strong>Joygiver<small>Owner dashboard</small></strong></NavLink>
         <nav aria-label="Owner dashboard">
@@ -59,6 +60,6 @@ export function AdminLayout() {
         <nav className="admin-mobile-nav" aria-label="Dashboard sections"><NavLink end to="/owner">Overview</NavLink><NavLink to="/owner/products">Products</NavLink><NavLink to="/owner/wholesale">Wholesale</NavLink><NavLink to="/owner/promotions">Promotions</NavLink><NavLink to="/owner/categories">Clothing Types</NavLink><NavLink to="/owner/site-settings">Site Settings</NavLink><NavLink to="/owner/account">Account</NavLink></nav>
         <Outlet context={{ owner }} />
       </div>
-    </div>
+    </div></>
   );
 }

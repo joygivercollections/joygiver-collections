@@ -322,6 +322,11 @@
 .admin-mobile-nav::-webkit-scrollbar { display: none; }
 .admin-mobile-nav a { min-height: 45px; flex: 1 0 auto; display: grid; place-items: center; padding: 0 14px; color: var(--muted); font-size: .63rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .admin-mobile-nav a.active { color: var(--charcoal); box-shadow: inset 0 -2px var(--champagne); }
+.owner-install { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 9px 16px; border-bottom: 1px solid #d6cbb9; background: #eee8dc; color: var(--charcoal); font-size: .68rem; }
+.owner-install button, .owner-install summary { min-height: 34px; display: inline-flex; align-items: center; border: 1px solid var(--charcoal); padding: 0 12px; background: var(--charcoal); color: white; font-size: .58rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.owner-install--ios { display: block; text-align: center; }
+.owner-install--ios summary { width: fit-content; margin-inline: auto; }
+.owner-install--ios p { max-width: 560px; margin: 10px auto 0; color: var(--muted); line-height: 1.55; }
 .admin-content { width: min(100% - 30px, 1180px); margin-inline: auto; padding-block: 42px 80px; }
 .admin-page-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 34px; }
 .admin-page-head h1 { margin-bottom: 12px; font-size: clamp(2.8rem, 7vw, 5rem); }
